@@ -426,7 +426,7 @@ export function Td({
   colSpan?: number;
 }) {
   return (
-    <td colSpan={colSpan} className={`px-4 py-3 align-middle text-stone-700 ${className}`}>
+    <td colSpan={colSpan} className={`px-4 py-3 align-middle ${className || "text-stone-700"}`}>
       {children}
     </td>
   );

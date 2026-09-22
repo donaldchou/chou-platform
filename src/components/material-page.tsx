@@ -78,7 +78,7 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
               <div className="flex flex-wrap gap-1">{m.properties.map((p) => <Badge key={p} tone="green">{p}</Badge>)}</div>
             </Td>
             <Td>{m.usagePeriod || "—"}</Td>
-            <Td className="font-semibold text-red-600">{m.bannedPeriod || <span className="font-normal text-stone-400">—</span>}</Td>
+            <Td>{m.bannedPeriod ? <span className="font-semibold text-red-600">{m.bannedPeriod}</span> : <span className="text-stone-400">—</span>}</Td>
             <Td>{supplier(m.supplierId)?.name ?? "—"}</Td>
             <Td><RowActions onEdit={() => setEditing(m)} onDelete={() => remove("materials", m.id)} /></Td>
           </tr>
@@ -99,12 +99,8 @@ function MaterialModal({ material, title, onClose }: { material: Material; title
 
   function save() {
     if (!m.nameZh.trim()) return alert("請填寫中文名稱");
-    const next = { ...m, updatedAt: todayStr() };
-    // Keep the previous price when it changes.
-    if (!isNew && material.price !== m.price) {
-      next.priceHistory = [...m.priceHistory, { date: material.updatedAt, price: material.price }];
-    }
-    upsert("materials", next);
+    // 登入／異動時間與歷史價格由後端維護
+    upsert("materials", m);
     onClose();
   }
 
@@ -151,6 +147,9 @@ function MaterialModal({ material, title, onClose }: { material: Material; title
           <Input value={m.dilution} onChange={(e) => set("dilution", e.target.value)} placeholder="例：2000" />
         </Field>
       </div>
+      {!isNew && m.price !== material.price && (
+        <p className="mt-2 text-xs text-amber-700">儲存後，原價格 {money(material.price)} 會記錄到歷史價格。</p>
+      )}
       {m.priceHistory.length > 0 && (
         <div className="mt-3 rounded-lg bg-stone-100 p-3 text-sm">
           <div className="mb-1 flex items-center gap-1 font-medium text-stone-700"><History size={14} /> 歷史價格</div>

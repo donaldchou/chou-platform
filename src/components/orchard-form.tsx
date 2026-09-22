@@ -15,13 +15,17 @@ export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boole
   const [o, setO] = useState<Orchard>(initial);
   const set = <K extends keyof Orchard>(k: K, v: Orchard[K]) => setO((p) => ({ ...p, [k]: v }));
 
-  function save() {
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
     if (!o.nameZh.trim()) {
       alert("請填寫果園中文名稱");
       return;
     }
-    upsert("orchards", o);
-    router.push(`/orchards/${o.id}`);
+    setSaving(true);
+    const ok = await upsert("orchards", o);
+    setSaving(false);
+    if (ok) router.push(`/orchards/${o.id}`);
   }
 
   const contractDays = daysUntil(o.contract.end);
@@ -268,7 +272,9 @@ export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boole
         <Button variant="secondary" onClick={() => router.back()}>
           取消
         </Button>
-        <Button onClick={save}>{isNew ? "建立果園" : "儲存變更"}</Button>
+        <Button onClick={save} disabled={saving}>
+          {saving ? "儲存中…" : isNew ? "建立果園" : "儲存變更"}
+        </Button>
       </div>
     </div>
   );

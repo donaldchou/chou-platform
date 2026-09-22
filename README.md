@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CHOU 農場管理平台
 
-## Getting Started
+管理多個果園的水電費、套袋、採收、施肥、噴藥、剪枝、砍草紀錄，以及資材、店家、外請工人與員工。
 
-First, run the development server:
+- 前端：Next.js 16（App Router）+ Tailwind CSS v4
+- 後端：Next.js Route Handlers + Mongoose 9 + MongoDB Atlas
+
+## 開發
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local`：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+MONGODB_URI=mongodb+srv://...     # 必填
+GEMINI_API_KEY=...                # 選填，噴藥 AI 建議；沒設定時使用內建建議
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+第一次使用可以按側欄的「重設示範資料」，或呼叫 `POST /api/seed` 寫入示範資料。
 
-## Learn More
+## 程式結構
 
-To learn more about Next.js, take a look at the following resources:
+| 路徑 | 說明 |
+|---|---|
+| `src/lib/mongodb.ts` | 共用的 MongoDB 連線（`connectDB()`），dev 模式用 global 快取 |
+| `src/models/` | Mongoose schema |
+| `src/lib/collections.ts` | API 路徑 ↔ model 對照、可篩選欄位、排序 |
+| `src/lib/repo.ts` | 資料存取與商業規則 |
+| `src/app/api/` | API routes |
+| `src/lib/store.ts` | 前端資料快取（載入 `/api/db`，樂觀更新後寫回 API） |
+| `src/lib/types.ts` | 前後端共用的資料型別 |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 資料模型
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+所有文件的 `_id` 都是字串，API 輸出時轉成 `id`。子文件（地號、進場紀錄、配方…）保留自己的 `id` 欄位。
 
-## Deploy on Vercel
+| 集合 | Model | 內容 |
+|---|---|---|
+| `orchards` | Orchard | 果園：中英文名稱、照片、地號（經緯度／地目／面積）、取得資訊、合約、果樹數量、水塔、馬達、噴藥管線、電網、待嫁接／待重新種植、水塔管線照片、電號 |
+| `bills` | Bill | 水費／電費繳費單（`kind`: water / electricity） |
+| `bagging` | Bagging | 套袋：員工、紙袋箱數、外請工人、進場紀錄、便當、每袋工資、工資結算 |
+| `harvests` | Harvest | 採收開始／結束 |
+| `fertilizing` | Fertilizing | 施肥：肥料與每棵樹用量、包數、對象、員工、參考照片 |
+| `spraying` | Spraying | 噴藥：用水量、藥品（陣列順序＝加入順序）、對象、AI 建議 |
+| `labor` | Labor | 剪枝／砍草（`kind`: pruning / weeding）：外請工人日薪、進場紀錄、工資結算 |
+| `suppliers` | Supplier | 貨源店家 |
+| `materials` | Material | 農藥／肥料／包材（`category`），含歷史價格 |
+| `workers` | Worker | 外請工人 |
+| `employees` | Employee | 自己員工 |
+| `tasks` | Task | 工作指派與回報 |
+| `salaries` | Salary | 薪水 |
+| `bonuses` | Bonus | 分紅 |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## API
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 通用 CRUD（上面所有集合）
+
+| 方法 | 路徑 | 說明 |
+|---|---|---|
+| GET | `/api/<集合>` | 列表，可篩選（例：`/api/bills?kind=water&orchardId=o1&from=2026-01&to=2026-12`） |
+| POST | `/api/<集合>` | 新增，回 201；id 重複回 409 |
+| GET | `/api/<集合>/<id>` | 單筆，找不到回 404 |
+| PUT | `/api/<集合>/<id>` | 整筆儲存，不存在時建立 |
+| DELETE | `/api/<集合>/<id>` | 刪除，回 204 |
+
+可篩選欄位：bills（orchardId, kind）、materials（category, supplierId）、labor（orchardId, kind）、tasks（employeeId, orchardId, status）、salaries／bonuses（employeeId），其他紀錄（orchardId）。`from`／`to` 依各集合的主要日期欄位篩選。
+
+### 商業規則
+
+- **資料驗證**：必填欄位、列舉值、日期格式（`YYYY-MM-DD`、`YYYY-MM`）、金額不可為負，錯誤回 400。
+- **關聯檢查**：紀錄的 `orchardId`、薪水／分紅／工作的 `employeeId` 必須存在。
+- **資材價格歷史**：價格變動時，後端自動把舊價格加進 `priceHistory`，並更新「資訊異動時間」。
+- **刪除果園**：底下還有紀錄時回 409 和各類紀錄筆數；帶 `?cascade=true` 才會一併刪除。
+
+### 其他
+
+| 方法 | 路徑 | 說明 |
+|---|---|---|
+| GET | `/api/db` | 一次取得所有資料（前端啟動時使用） |
+| GET | `/api/health` | 檢查資料庫連線 |
+| GET | `/api/reminders?days=90` | 合約到期（預設 3 個月內）、逾期工作、有禁用期的資材、待完成事項；可給排程推播用 |
+| GET | `/api/stats/bills?kind=water&year=2026&orchardId=o1` | 水電費每月、歷年、各果園統計 |
+| POST | `/api/ai/spray-advice` | 噴藥 AI 建議，body：`{ stage, targets, waterLiters, materialIds }` |
+| POST | `/api/seed` | 清空並寫入示範資料，body 必須是 `{ "confirm": "RESET" }` |
+
+## 尚未實作
+
+- 登入與權限：目前任何能連到網站的人都能讀寫資料
+- 照片目前以壓縮後的 base64 存在文件中（單一文件上限 16MB）；照片多時建議改存 Vercel Blob 等物件儲存

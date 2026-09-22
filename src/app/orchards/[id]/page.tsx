@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Pencil, Trash2 } from "lucide-react";
-import { remove, useDB, useHydrated } from "@/lib/store";
+import { remove, useDB, useDBStatus } from "@/lib/store";
 import { FRUITS } from "@/lib/types";
 import {
   Badge,
@@ -30,10 +30,10 @@ export default function OrchardDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const db = useDB();
-  const hydrated = useHydrated();
+  const { ready } = useDBStatus();
   const o = db.orchards.find((x) => x.id === id);
 
-  if (!hydrated) return null;
+  if (!ready) return null;
   if (!o) return <Empty>找不到這個果園。<Link href="/orchards" className="text-emerald-700 underline">回列表</Link></Empty>;
 
   const s = contractStatus(o);
@@ -75,9 +75,8 @@ export default function OrchardDetail() {
             <Button
               variant="secondary"
               className="text-red-600"
-              onClick={() => {
-                if (confirmDelete(`「${o.nameZh}」`)) {
-                  remove("orchards", o.id);
+              onClick={async () => {
+                if (confirmDelete(`「${o.nameZh}」`) && (await remove("orchards", o.id))) {
                   router.push("/orchards");
                 }
               }}

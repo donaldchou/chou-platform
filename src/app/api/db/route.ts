@@ -1,0 +1,12 @@
+import { NextResponse } from "next/server";
+import { handleError } from "@/lib/api";
+import { loadAll } from "@/lib/repo";
+
+/** GET /api/db 一次取得所有資料，前端啟動時使用 */
+export async function GET() {
+  try {
+    return NextResponse.json(await loadAll());
+  } catch (err) {
+    return handleError(err);
+  }
+}

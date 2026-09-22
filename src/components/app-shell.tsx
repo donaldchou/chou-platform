@@ -26,7 +26,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { resetDemo } from "@/lib/store";
+import { reload, resetDemo, useDBStatus } from "@/lib/store";
 
 const NAV = [
   {
@@ -113,7 +113,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <button
           onClick={() => {
-            if (confirm("要清除所有變更，還原成示範資料嗎？")) resetDemo();
+            if (confirm("會清空資料庫中的所有資料，並寫入示範資料。確定嗎？")) void resetDemo();
           }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-emerald-200/80 hover:bg-emerald-800/70"
         >
@@ -150,8 +150,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <span className="font-semibold text-stone-800">CHOU 農場平台</span>
         </header>
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <DBStatusBanner />
+          {children}
+        </main>
       </div>
     </div>
   );
+}
+
+function DBStatusBanner() {
+  const { status, error } = useDBStatus();
+  if (status === "loading" || status === "idle") {
+    return (
+      <div className="mb-4 flex items-center gap-2 rounded-lg bg-white px-4 py-3 text-sm text-stone-500 shadow-sm">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+        正在從資料庫載入資料…
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <span>無法連線到資料庫：{error}</span>
+        <button onClick={() => void reload()} className="rounded-md bg-red-600 px-3 py-1 text-white hover:bg-red-700">
+          重試
+        </button>
+      </div>
+    );
+  }
+  return null;
 }

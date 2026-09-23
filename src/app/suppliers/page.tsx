@@ -1,11 +1,12 @@
 "use client";
 
 import { Fragment, useState, useSyncExternalStore } from "react";
-import { LayoutGrid, List, MapPin, Phone, Plus, Search, ShieldAlert, Store, UserRound, X } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ChevronRight, LayoutGrid, List, MapPin, Package, Phone, Plus, Search, ShieldAlert, Store, UserRound, X } from "lucide-react";
 import { removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
 import { searchSuppliers } from "@/lib/supplier-search";
-import { SUPPLIER_CONTACTS, type Supplier, type SupplierContact } from "@/lib/types";
-import { uid } from "@/lib/utils";
+import { SUPPLIER_CONTACTS, type MaterialCategory, type Supplier, type SupplierContact } from "@/lib/types";
+import { UNIT_SHORT, money, uid } from "@/lib/utils";
 import {
   Button,
   Card,
@@ -82,7 +83,7 @@ function Hl({ text, query }: { text: string; query: string }) {
   );
 }
 
-type Actions = { onEdit: (s: Supplier) => void; onDelete: (s: Supplier) => void };
+type Actions = { onEdit: (s: Supplier) => void; onDelete: (s: Supplier) => void; onMaterials: (s: Supplier) => void };
 
 export default function SuppliersPage() {
   const db = useDB();
@@ -96,7 +97,8 @@ export default function SuppliersPage() {
 
   const results = searchSuppliers(db.suppliers, db.materials, query);
   const count = (id: string) => db.materials.filter((m) => m.supplierId === id).length;
-  const actions: Actions = { onEdit: (s) => setGate({ supplier: s }), onDelete: setDeleting };
+  const [showing, setShowing] = useState<Supplier | null>(null);
+  const actions: Actions = { onEdit: (s) => setGate({ supplier: s }), onDelete: setDeleting, onMaterials: setShowing };
 
   return (
     <>
@@ -198,6 +200,7 @@ export default function SuppliersPage() {
         />
       )}
       {deleting && <DeleteSupplierModal supplier={deleting} onClose={() => setDeleting(null)} />}
+      {showing && <SupplierMaterialsModal supplier={showing} onClose={() => setShowing(null)} />}
     </>
   );
 }
@@ -218,6 +221,7 @@ function SupplierCard({
   materialHits,
   onEdit,
   onDelete,
+  onMaterials,
 }: { s: Supplier; query: string; count: number; materialHits: string[] } & Actions) {
   const contacts = (s.contacts ?? []).filter((c) => c.name || c.phone);
   const cards = s.cardPhotos ?? [];
@@ -274,7 +278,7 @@ function SupplierCard({
 
       <div className="mt-auto flex justify-between gap-2 border-t border-stone-100 pt-3 text-xs text-stone-500">
         <span><Hl text={s.note} query={query} /></span>
-        <span className="shrink-0">供應 {count} 項資材</span>
+        <MaterialsLink count={count} onClick={() => onMaterials(s)} label={`供應 ${count} 項資材`} />
       </div>
     </Card>
   );
@@ -286,6 +290,7 @@ function SupplierTable({
   count,
   onEdit,
   onDelete,
+  onMaterials,
 }: {
   rows: { s: Supplier; materialHits: string[] }[];
   query: string;
@@ -350,7 +355,7 @@ function SupplierTable({
                 <span className="text-stone-400">—</span>
               )}
             </Td>
-            <Td className="whitespace-nowrap">{count(s.id)} 項</Td>
+            <Td className="whitespace-nowrap"><MaterialsLink count={count(s.id)} onClick={() => onMaterials(s)} label={`${count(s.id)} 項`} /></Td>
             <Td>
               <RowActions confirm={false} onEdit={() => onEdit(s)} onDelete={() => onDelete(s)} />
             </Td>
@@ -549,5 +554,91 @@ function DeleteSupplierModal({ supplier, onClose }: { supplier: Supplier; onClos
       即將刪除「<b>{supplier.name}</b>」，名片照片也會一併刪除，無法復原。
       {used > 0 && <div className="mt-1">有 {used} 項資材的購買地是這家店，刪除後會顯示為「—」。</div>}
     </CodeModal>
+  );
+}
+
+/** 「供應 N 項資材」：有資材時可以點開清單，0 項時只顯示文字 */
+function MaterialsLink({ count, label, onClick }: { count: number; label: string; onClick: () => void }) {
+  if (!count) return <span className="shrink-0 text-stone-400">{label}</span>;
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded font-medium text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:decoration-emerald-700"
+    >
+      {label}
+      <ChevronRight size={13} />
+    </button>
+  );
+}
+
+const CATEGORIES: { key: MaterialCategory; label: string; href: string }[] = [
+  { key: "pesticide", label: "農藥", href: "/materials/pesticides" },
+  { key: "fertilizer", label: "肥料", href: "/materials/fertilizers" },
+  { key: "packaging", label: "包材／乾貨", href: "/materials/packaging" },
+];
+
+/** 這家店供應的資材清單，依類別分組 */
+function SupplierMaterialsModal({ supplier, onClose }: { supplier: Supplier; onClose: () => void }) {
+  const db = useDB();
+  const items = db.materials.filter((m) => m.supplierId === supplier.id);
+
+  return (
+    <Modal
+      open
+      wide
+      onClose={onClose}
+      title={`${supplier.name}・供應資材（${items.length} 項）`}
+      footer={<Button variant="secondary" onClick={onClose}>關閉</Button>}
+    >
+      {items.length === 0 && <p className="text-sm text-stone-500">這家店目前沒有登錄任何資材。</p>}
+      <div className="space-y-6">
+        {CATEGORIES.map(({ key, label, href }) => {
+          const list = items.filter((m) => m.category === key);
+          if (!list.length) return null;
+          return (
+            <section key={key}>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
+                  <Package size={15} className="text-emerald-700" /> {label}（{list.length}）
+                </h3>
+                <Link href={href} onClick={onClose} className="text-xs text-emerald-700 hover:underline">
+                  前往{label}頁面 →
+                </Link>
+              </div>
+              <ul className="divide-y divide-stone-100 overflow-hidden rounded-lg border border-stone-200 bg-white">
+                {list.map((m) => (
+                  <li key={m.id} className="flex gap-3 p-3">
+                    <Thumb src={m.photo} className="h-12 w-12 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <div>
+                          <span className="font-medium text-stone-900">{m.nameZh}</span>
+                          {m.nameEn && <span className="ml-1.5 text-xs text-stone-500">{m.nameEn}</span>}
+                        </div>
+                        <div className="whitespace-nowrap text-sm">
+                          <span className="text-stone-500">{m.size}{UNIT_SHORT[m.unit]}</span>
+                          <span className="ml-2 font-semibold text-stone-900">{money(m.price)}</span>
+                        </div>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-stone-600">
+                        {m.dilution && <span>稀釋 {m.dilution} 倍</span>}
+                        {m.targets && <span>防治對象：{m.targets}</span>}
+                        {m.usagePeriod && <span>使用時間：{m.usagePeriod}</span>}
+                        {m.properties.length > 0 && <span>性質：{m.properties.join("、")}</span>}
+                      </div>
+                      {m.bannedPeriod && (
+                        <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-600">
+                          <AlertTriangle size={12} /> {m.bannedPeriod}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    </Modal>
   );
 }

@@ -152,7 +152,7 @@ export function BillsPage({ kind }: { kind: BillKind }) {
             <Td>{orchardName(b.orchardId)}</Td>
             <Td className="font-medium">{money(b.amount)}</Td>
             <Td>{b.cycle}</Td>
-            <Td>{b.photos[0] ? <Thumb src={b.photos[0]} /> : <span className="text-stone-400">—</span>}</Td>
+            <Td>{b.photos[0] ? <Thumb src={b.photos[0]} photos={b.photos} showCount /> : <span className="text-stone-400">—</span>}</Td>
             <Td className="text-stone-500">{b.note}</Td>
             <Td className="whitespace-nowrap text-right">
               <Button size="sm" variant="ghost" onClick={() => setEditing(b)}>

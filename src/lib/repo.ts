@@ -93,7 +93,7 @@ export async function saveDoc(
   name: CollectionName,
   id: string,
   body: Data,
-  opts: { beforeCreate?: () => void; beforeUpdate?: () => void } = {},
+  opts: { beforeCreate?: (data: Data) => void; beforeUpdate?: (existing: Data, data: Data) => void } = {},
 ) {
   await connectDB();
   const Model = COLLECTIONS[name];
@@ -103,11 +103,11 @@ export async function saveDoc(
   const doc = await Model.findById(id);
   if (name === "materials") applyMaterialRules(data, doc ? (doc.toObject() as Data) : null);
   if (!doc) {
-    opts.beforeCreate?.(); // 例如檢查新增用的驗證碼
+    opts.beforeCreate?.(data); // 例如檢查新增用的驗證碼
     const created = await Model.create({ ...data, _id: id });
     return { doc: toClient(created.toObject()), created: true };
   }
-  opts.beforeUpdate?.(); // 例如檢查修改用的驗證碼
+  opts.beforeUpdate?.(doc.toObject() as Data, data); // 例如檢查修改用的驗證碼
   const before = collectBlobUrls(doc.toObject());
   doc.overwrite(data);
   await doc.save();
@@ -118,11 +118,17 @@ export async function saveDoc(
 }
 
 /** 刪除。果園底下還有紀錄時回 409，帶 cascade=true 才會一併刪除 */
-export async function deleteDoc(name: CollectionName, id: string, cascade: boolean) {
+export async function deleteDoc(
+  name: CollectionName,
+  id: string,
+  cascade: boolean,
+  opts: { beforeDelete?: (existing: Data) => void } = {},
+) {
   await connectDB();
   const Model = COLLECTIONS[name];
   const existing = await Model.findById(id).lean();
   if (!existing) throw new HttpError(404, "找不到資料");
+  opts.beforeDelete?.(existing as Data); // 例如檢查刪除用的驗證碼
   const photos = collectBlobUrls(existing);
 
   if (name === "orchards") {

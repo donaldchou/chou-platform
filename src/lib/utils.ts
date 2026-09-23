@@ -1,4 +1,4 @@
-import type { Attendance, Material, MaterialUnit, Orchard } from "./types";
+import type { Attendance, Material, MaterialCategory, MaterialUnit, Orchard } from "./types";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -95,6 +95,10 @@ export function materialCost(m: Material | undefined, amount: number) {
   const base = m.unit === "kg" ? m.size * 1000 : m.size;
   return (m.price / base) * amount;
 }
+
+/** 各類資材欄位名稱：肥料的 targets 欄位是「成分說明」 */
+export const materialTargetsLabel = (category: MaterialCategory) =>
+  category === "fertilizer" ? "成分說明" : "防治對象";
 
 export const materialName = (m?: Material) =>
   m ? `${m.nameZh}${m.nameEn ? ` (${m.nameEn})` : ""}` : "（已刪除）";

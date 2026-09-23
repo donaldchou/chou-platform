@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Pencil, Trash2, X } from "lucide-react";
+import { Lightbox } from "./lightbox";
 import { photoSrc, uploadPhoto } from "@/lib/utils";
+
+export { Lightbox };
 
 export const inputCls =
   "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 disabled:bg-stone-100";
@@ -311,7 +314,7 @@ export function PhotoUpload({
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<number | null>(null);
 
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
@@ -332,7 +335,7 @@ export function PhotoUpload({
       {value.map((src, i) => (
         <div key={i} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-stone-200">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoSrc(src)} alt="" className="h-full w-full cursor-zoom-in object-cover" onClick={() => setPreview(src)} />
+          <img src={photoSrc(src)} alt="" className="h-full w-full cursor-zoom-in object-cover" onClick={() => setPreview(i)} />
           <button
             type="button"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
@@ -362,43 +365,56 @@ export function PhotoUpload({
         hidden
         onChange={(e) => onFiles(e.target.files)}
       />
-      {preview && <Lightbox src={preview} onClose={() => setPreview(null)} />}
+      {preview !== null && <Lightbox photos={value} start={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }
 
-export function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photoSrc(src)} alt="" className="max-h-full max-w-full rounded-lg" />
-    </div>
-  );
-}
-
-export function Thumb({ src, className = "h-10 w-10" }: { src?: string; className?: string }) {
+/**
+ * 縮圖，點了放大。傳入 photos（同一組的所有照片）時，放大後可以切換到其他照片；
+ * 有多張時右下角顯示張數。
+ */
+export function Thumb({
+  src,
+  photos,
+  className = "h-10 w-10",
+  showCount = false,
+}: {
+  src?: string;
+  photos?: string[];
+  className?: string;
+  showCount?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   if (!src) return <div className={`${className} rounded-md bg-stone-100`} />;
+  const list = photos?.length ? photos : [src];
+  const start = Math.max(0, list.indexOf(src));
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photoSrc(src)}
-        alt=""
+      <button
+        type="button"
         onClick={() => setOpen(true)}
-        className={`${className} cursor-zoom-in rounded-md object-cover`}
-      />
-      {open && <Lightbox src={src} onClose={() => setOpen(false)} />}
+        className="relative block shrink-0 cursor-zoom-in"
+        aria-label={list.length > 1 ? `檢視照片（共 ${list.length} 張）` : "檢視照片"}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photoSrc(src)} alt="" className={`${className} rounded-md object-cover`} />
+        {showCount && list.length > 1 && (
+          <span className="absolute -bottom-1 -right-1 rounded-full bg-stone-700 px-1 text-[10px] leading-4 text-white">
+            {list.length}
+          </span>
+        )}
+      </button>
+      {open && <Lightbox photos={list} start={start} onClose={() => setOpen(false)} />}
     </>
   );
 }
-
 export function Gallery({ photos, size = "h-20 w-20" }: { photos: string[]; size?: string }) {
   if (!photos.length) return <span className="text-sm text-stone-400">無照片</span>;
   return (
     <div className="flex flex-wrap gap-2">
       {photos.map((p, i) => (
-        <Thumb key={i} src={p} className={size} />
+        <Thumb key={i} src={p} photos={photos} className={size} />
       ))}
     </div>
   );

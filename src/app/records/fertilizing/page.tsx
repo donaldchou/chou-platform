@@ -139,7 +139,7 @@ function FertModal({ record, onClose }: { record: FertilizingRecord; onClose: ()
               set("items", r.items.map((x) => (x.id === it.id ? { ...x, ...patch } : x)));
             return (
               <div key={it.id} className="grid grid-cols-2 items-end gap-2 rounded-lg bg-stone-100 p-2 sm:grid-cols-[auto_2fr_1fr_1fr_1fr_1fr_auto]">
-                <Thumb src={m?.photo} className="h-10 w-10" />
+                <Thumb src={m?.photos?.[0]} photos={m?.photos} showCount className="h-10 w-10" />
                 <Field label="肥料品牌">
                   <Select value={it.materialId} onChange={(e) => upd({ materialId: e.target.value })}>
                     {ferts.map((f) => <option key={f.id} value={f.id}>{materialName(f)}</option>)}
@@ -209,7 +209,7 @@ function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onCl
             const m = db.materials.find((x) => x.id === it.materialId);
             return (
               <div key={it.id} className="flex gap-3 rounded-lg bg-stone-50 p-3">
-                <Thumb src={m?.photo} className="h-16 w-16" />
+                <Thumb src={m?.photos?.[0]} photos={m?.photos} showCount className="h-16 w-16" />
                 <div className="text-sm">
                   <div className="font-semibold">{materialName(m)}</div>
                   {it.gramsPerTree > 0 && <div>每棵樹 {it.gramsPerTree} 公克</div>}

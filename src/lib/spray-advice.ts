@@ -1,4 +1,5 @@
 import type { Material } from "./types";
+import { materialTargetsLabel } from "./utils";
 
 export const STAGES = ["休眠期", "萌芽期", "開花期", "幼果期", "套袋前", "果實肥大期", "採收前", "採收後"];
 
@@ -34,7 +35,7 @@ export function advicePrompt(stage: string, targets: string, waterLiters: number
         .map(
           (m, i) =>
             `${i + 1}. ${m.nameZh}${m.nameEn ? `（${m.nameEn}）` : ""}：稀釋 ${m.dilution || "未填"} 倍，` +
-            `防治對象 ${m.targets || "未填"}，性質 ${m.properties.join("、") || "未填"}，` +
+            `${materialTargetsLabel(m.category)} ${m.targets || "未填"}，性質 ${m.properties.join("、") || "未填"}，` +
             `使用時間 ${m.usagePeriod || "未填"}，禁用時間 ${m.bannedPeriod || "無"}`,
         )
         .join("\n")

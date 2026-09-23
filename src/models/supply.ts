@@ -26,18 +26,18 @@ const MaterialSchema = new Schema({
   category: { type: String, enum: ["pesticide", "fertilizer", "packaging"], required: true, index: true },
   nameZh: { type: String, required: [true, "請填寫中文名稱"], trim: true },
   nameEn: str,
-  createdAt: ymd, // 登入時間
+  createdAt: ymd, // 登錄時間
   updatedAt: ymd, // 資訊異動時間
   unit: { type: String, enum: ["ml", "g", "kg", "片"], required: true },
   size: money, // 每瓶／每包的容量
   price: money,
   priceHistory: { type: [new Schema({ date: ymd, price: money }, sub)], default: [] }, // 保留之前的價格
   dilution: str, // 使用比例（倍數）
-  targets: str, // 防治對象
+  targets: str, // 農藥：防治對象；肥料：成分說明
   properties: { type: [String], default: [] }, // 性質
   usagePeriod: str, // 使用時間
   bannedPeriod: str, // 禁用時間（紅字提醒）
-  photo: str,
+  photos, // 照片（可多張）
   supplierId: { type: String, ref: "Supplier", default: "", index: true }, // 購買地
 });
 

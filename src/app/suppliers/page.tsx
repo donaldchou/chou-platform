@@ -2,11 +2,12 @@
 
 import { Fragment, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronRight, LayoutGrid, List, MapPin, Package, Phone, Plus, Search, ShieldAlert, Store, UserRound, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, LayoutGrid, List, MapPin, Package, Phone, Plus, Search, Store, UserRound, X } from "lucide-react";
 import { removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
+import { CodeModal } from "@/components/code-modal";
 import { searchSuppliers } from "@/lib/supplier-search";
 import { SUPPLIER_CONTACTS, type MaterialCategory, type Supplier, type SupplierContact } from "@/lib/types";
-import { UNIT_SHORT, money, uid } from "@/lib/utils";
+import { UNIT_SHORT, materialTargetsLabel, money, uid } from "@/lib/utils";
 import {
   Button,
   Card,
@@ -348,7 +349,7 @@ function SupplierTable({
             <Td className="whitespace-nowrap">
               {cards.length ? (
                 <div className="flex items-center gap-2">
-                  <Thumb src={cards[0]} className="h-10 w-14" />
+                  <Thumb src={cards[0]} photos={cards} className="h-10 w-14" />
                   {cards.length > 1 && <span className="text-xs text-stone-500">共 {cards.length} 張</span>}
                 </div>
               ) : (
@@ -430,77 +431,6 @@ function SupplierModal({ supplier, code, onClose }: { supplier: Supplier; code?:
           <Textarea value={s.note} onChange={(e) => setS({ ...s, note: e.target.value })} />
         </Field>
       </div>
-    </Modal>
-  );
-}
-
-/** 輸入驗證碼的對話框：交給 onSubmit 檢查，錯誤時顯示訊息並讓使用者重新輸入 */
-function CodeModal({
-  title,
-  confirmLabel,
-  danger = false,
-  onSubmit,
-  onClose,
-  children,
-}: {
-  title: string;
-  confirmLabel: string;
-  danger?: boolean;
-  onSubmit: (code: string) => Promise<{ ok: true } | { ok: false; error: string }>;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!code.trim()) return setError("請輸入驗證碼");
-    setBusy(true);
-    setError("");
-    const res = await onSubmit(code.trim());
-    setBusy(false);
-    if (!res.ok) {
-      setError(res.error);
-      setCode("");
-    }
-  }
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={title}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button variant={danger ? "danger" : "primary"} type="submit" form="code-form" disabled={busy}>
-            {busy ? "驗證中…" : confirmLabel}
-          </Button>
-        </>
-      }
-    >
-      <form id="code-form" onSubmit={submit} className="space-y-4">
-        <div
-          className={`flex gap-3 rounded-lg p-3 text-sm ${danger ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-900"}`}
-        >
-          <ShieldAlert size={20} className="shrink-0" />
-          <div>{children}</div>
-        </div>
-        <Field label="請輸入驗證碼" hint={error && <span className="font-medium text-red-600">{error}</span>}>
-          <Input
-            type="password"
-            autoFocus
-            autoComplete="off"
-            value={code}
-            onChange={(e) => {
-              setCode(e.target.value);
-              setError("");
-            }}
-          />
-        </Field>
-      </form>
     </Modal>
   );
 }
@@ -608,7 +538,7 @@ function SupplierMaterialsModal({ supplier, onClose }: { supplier: Supplier; onC
               <ul className="divide-y divide-stone-100 overflow-hidden rounded-lg border border-stone-200 bg-white">
                 {list.map((m) => (
                   <li key={m.id} className="flex gap-3 p-3">
-                    <Thumb src={m.photo} className="h-12 w-12 shrink-0" />
+                    <Thumb src={m.photos?.[0]} photos={m.photos} showCount className="h-12 w-12 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <div>
@@ -622,7 +552,7 @@ function SupplierMaterialsModal({ supplier, onClose }: { supplier: Supplier; onC
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-stone-600">
                         {m.dilution && <span>稀釋 {m.dilution} 倍</span>}
-                        {m.targets && <span>防治對象：{m.targets}</span>}
+                        {m.targets && <span>{materialTargetsLabel(m.category)}：{m.targets}</span>}
                         {m.usagePeriod && <span>使用時間：{m.usagePeriod}</span>}
                         {m.properties.length > 0 && <span>性質：{m.properties.join("、")}</span>}
                       </div>

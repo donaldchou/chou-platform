@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, History, Plus, Search } from "lucide-react";
-import { remove, upsert, useDB } from "@/lib/store";
+import { remove, removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
 import type { Material, MaterialCategory, MaterialUnit } from "@/lib/types";
-import { UNIT_LABELS, UNIT_SHORT, money, todayStr, uid } from "@/lib/utils";
+import { UNIT_LABELS, UNIT_SHORT, materialTargetsLabel, money, todayStr, uid } from "@/lib/utils";
+import { CodeModal } from "./code-modal";
 import {
   Badge,
   Button,
@@ -24,17 +25,43 @@ import {
   Thumb,
 } from "./ui";
 
-const META: Record<MaterialCategory, { title: string; units: MaterialUnit[]; props: string[] }> = {
-  pesticide: { title: "農藥", units: ["ml", "g", "kg"], props: ["殺細菌", "病毒", "殺蟲", "營養補充"] },
-  fertilizer: { title: "肥料", units: ["ml", "g", "kg"], props: ["殺細菌", "病毒", "殺蟲", "營養補充"] },
-  packaging: { title: "包材／乾貨", units: ["g", "kg", "片"], props: ["套袋", "包裝", "防潮", "資材"] },
+type Meta = {
+  title: string;
+  units: MaterialUnit[];
+  props: string[];
+  targetsPlaceholder: string;
+  createdLabel: string;
+  maxPhotos: number;
+  /** 新增／修改／刪除要輸入驗證碼（後端也會檢查） */
+  needsCode: boolean;
+};
+
+const META: Record<MaterialCategory, Meta> = {
+  pesticide: {
+    title: "農藥", units: ["ml", "g", "kg"], props: ["殺細菌", "病毒", "殺蟲", "營養補充"],
+    targetsPlaceholder: "例：炭疽病、薊馬", createdLabel: "登入時間", maxPhotos: 1, needsCode: false,
+  },
+  fertilizer: {
+    title: "肥料", units: ["ml", "g", "kg"],
+    props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥"],
+    targetsPlaceholder: "例：氮 15%、磷 15%、鉀 15%", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
+  },
+  packaging: {
+    title: "包材／乾貨", units: ["g", "kg", "片"], props: ["套袋", "包裝", "防潮", "資材"],
+    targetsPlaceholder: "", createdLabel: "登入時間", maxPhotos: 1, needsCode: false,
+  },
 };
 
 export function MaterialPage({ category }: { category: MaterialCategory }) {
   const db = useDB();
   const meta = META[category];
+  const targetsLabel = materialTargetsLabel(category);
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Material | null>(null);
+  // 需要驗證碼的類別：先驗證再打開表單，驗證碼留著儲存時送給後端
+  const [gate, setGate] = useState<{ material: Material | null } | null>(null);
+  const [deleting, setDeleting] = useState<Material | null>(null);
+  const [code, setCode] = useState<string | undefined>();
   const list = db.materials
     .filter((m) => m.category === category)
     .filter((m) => !q || `${m.nameZh}${m.nameEn}${m.targets}`.toLowerCase().includes(q.toLowerCase()));
@@ -43,54 +70,125 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
   const create = (): Material => ({
     id: uid(), category, nameZh: "", nameEn: "", createdAt: todayStr(), updatedAt: todayStr(),
     unit: meta.units[0], size: 0, price: 0, priceHistory: [], dilution: "", targets: "", properties: [],
-    usagePeriod: "", bannedPeriod: "", photo: "", supplierId: db.suppliers[0]?.id ?? "",
+    usagePeriod: "", bannedPeriod: "", photos: [], supplierId: db.suppliers[0]?.id ?? "",
   });
+  const startCreate = () => (meta.needsCode ? setGate({ material: null }) : setEditing(create()));
+  const startEdit = (m: Material) => (meta.needsCode ? setGate({ material: m }) : setEditing(m));
 
   return (
     <>
       <PageHeader
         title={`${meta.title}（使用方式）`}
         desc="登錄品項、價格、使用比例與禁用時間；修改價格時會保留歷史價格。"
-        action={<Button onClick={() => setEditing(create())}><Plus size={16} /> 新增{meta.title}</Button>}
+        action={<Button onClick={startCreate}><Plus size={16} /> 新增{meta.title}</Button>}
       />
       <div className="relative mb-4 max-w-sm">
         <Search size={16} className="absolute left-3 top-2.5 text-stone-400" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜尋名稱或防治對象" className="pl-9" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`搜尋名稱或${targetsLabel}`} className="pl-9" />
       </div>
-      <Table head={["", "名稱", "規格／價格", "使用比例", "防治對象", "性質", "使用時間", "禁用時間", "購買地", ""]}>
-        {list.map((m) => (
-          <tr key={m.id} className="hover:bg-stone-50">
-            <Td><Thumb src={m.photo} /></Td>
-            <Td>
-              <div className="font-medium">{m.nameZh}</div>
-              <div className="text-xs text-stone-500">{m.nameEn}</div>
-            </Td>
-            <Td className="whitespace-nowrap">
-              {m.size}{UNIT_SHORT[m.unit]}
-              <div className="font-semibold">{money(m.price)}</div>
-              {m.priceHistory.length > 0 && (
-                <div className="text-xs text-stone-400">前次 {money(m.priceHistory[m.priceHistory.length - 1].price)}</div>
-              )}
-            </Td>
-            <Td>{m.dilution ? `${m.dilution} 倍` : "—"}</Td>
-            <Td>{m.targets || "—"}</Td>
-            <Td>
-              <div className="flex flex-wrap gap-1">{m.properties.map((p) => <Badge key={p} tone="green">{p}</Badge>)}</div>
-            </Td>
-            <Td>{m.usagePeriod || "—"}</Td>
-            <Td>{m.bannedPeriod ? <span className="font-semibold text-red-600">{m.bannedPeriod}</span> : <span className="text-stone-400">—</span>}</Td>
-            <Td>{supplier(m.supplierId)?.name ?? "—"}</Td>
-            <Td><RowActions onEdit={() => setEditing(m)} onDelete={() => remove("materials", m.id)} /></Td>
-          </tr>
-        ))}
+      <Table head={["", "名稱", "規格／價格", "使用比例", targetsLabel, "性質", "使用時間", "禁用時間", "購買地", ""]}>
+        {list.map((m) => {
+          const photos = m.photos ?? [];
+          return (
+            <tr key={m.id} className="hover:bg-stone-50">
+              <Td>
+                <Thumb src={photos[0]} photos={photos} showCount />
+              </Td>
+              <Td>
+                <div className="font-medium">{m.nameZh}</div>
+                <div className="text-xs text-stone-500">{m.nameEn}</div>
+              </Td>
+              <Td className="whitespace-nowrap">
+                {m.size}{UNIT_SHORT[m.unit]}
+                <div className="font-semibold">{money(m.price)}</div>
+                {m.priceHistory.length > 0 && (
+                  <div className="text-xs text-stone-400">前次 {money(m.priceHistory[m.priceHistory.length - 1].price)}</div>
+                )}
+              </Td>
+              <Td>{m.dilution ? `${m.dilution} 倍` : "—"}</Td>
+              <Td>{m.targets || "—"}</Td>
+              <Td>
+                <div className="flex flex-wrap gap-1">{m.properties.map((p) => <Badge key={p} tone="green">{p}</Badge>)}</div>
+              </Td>
+              <Td>{m.usagePeriod || "—"}</Td>
+              <Td>{m.bannedPeriod ? <span className="font-semibold text-red-600">{m.bannedPeriod}</span> : <span className="text-stone-400">—</span>}</Td>
+              <Td>{supplier(m.supplierId)?.name ?? "—"}</Td>
+              <Td>
+                {meta.needsCode ? (
+                  <RowActions confirm={false} onEdit={() => startEdit(m)} onDelete={() => setDeleting(m)} />
+                ) : (
+                  <RowActions onEdit={() => startEdit(m)} onDelete={() => remove("materials", m.id)} />
+                )}
+              </Td>
+            </tr>
+          );
+        })}
         {!list.length && <tr><Td colSpan={10} className="py-8 text-center text-stone-400">沒有資料</Td></tr>}
       </Table>
-      {editing && <MaterialModal material={editing} title={meta.title} onClose={() => setEditing(null)} />}
+
+      {gate && (
+        <CodeModal
+          title={gate.material ? `編輯${meta.title}` : `新增${meta.title}`}
+          confirmLabel="下一步"
+          onClose={() => setGate(null)}
+          onSubmit={async (c) => {
+            const res = await verifyCode("materials", gate.material ? "update" : "create", c, category);
+            if (res.ok) {
+              setCode(c);
+              setEditing(gate.material ?? create());
+              setGate(null);
+            }
+            return res;
+          }}
+        >
+          {gate.material ? (
+            <>編輯「<b>{gate.material.nameZh}</b>」需要驗證碼。</>
+          ) : (
+            `新增${meta.title}需要驗證碼。`
+          )}
+        </CodeModal>
+      )}
+      {deleting && (
+        <CodeModal
+          title={`刪除${meta.title}`}
+          confirmLabel="確認刪除"
+          danger
+          onClose={() => setDeleting(null)}
+          onSubmit={async (c) => {
+            const res = await removeWithCode("materials", deleting.id, c);
+            if (res.ok) setDeleting(null);
+            return res;
+          }}
+        >
+          即將刪除「<b>{deleting.nameZh}</b>」，照片也會一併刪除，無法復原。
+        </CodeModal>
+      )}
+      {editing && (
+        <MaterialModal
+          material={editing}
+          title={meta.title}
+          code={code}
+          onClose={() => {
+            setEditing(null);
+            setCode(undefined);
+          }}
+        />
+      )}
     </>
   );
 }
 
-function MaterialModal({ material, title, onClose }: { material: Material; title: string; onClose: () => void }) {
+function MaterialModal({
+  material,
+  title,
+  code,
+  onClose,
+}: {
+  material: Material;
+  title: string;
+  code?: string;
+  onClose: () => void;
+}) {
   const db = useDB();
   const meta = META[material.category];
   const [m, setM] = useState(material);
@@ -99,8 +197,8 @@ function MaterialModal({ material, title, onClose }: { material: Material; title
 
   function save() {
     if (!m.nameZh.trim()) return alert("請填寫中文名稱");
-    // 登入／異動時間與歷史價格由後端維護
-    upsert("materials", m);
+    // 登錄／異動時間與歷史價格由後端維護
+    upsert("materials", m, { code });
     onClose();
   }
 
@@ -125,7 +223,7 @@ function MaterialModal({ material, title, onClose }: { material: Material; title
           <Input value={m.nameEn} onChange={(e) => set("nameEn", e.target.value)} />
         </Field>
         <div className="flex gap-6 text-sm text-stone-500 sm:col-span-2">
-          <span>登入時間：{m.createdAt}</span>
+          <span>{meta.createdLabel}：{m.createdAt}</span>
           <span>資訊異動時間：{m.updatedAt}</span>
         </div>
       </div>
@@ -163,8 +261,8 @@ function MaterialModal({ material, title, onClose }: { material: Material; title
 
       <SectionTitle>使用方式</SectionTitle>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="防治對象">
-          <Input value={m.targets} onChange={(e) => set("targets", e.target.value)} placeholder="例：炭疽病、薊馬" />
+        <Field label={materialTargetsLabel(m.category)}>
+          <Input value={m.targets} onChange={(e) => set("targets", e.target.value)} placeholder={meta.targetsPlaceholder} />
         </Field>
         <Field label="使用時間">
           <Input value={m.usagePeriod} onChange={(e) => set("usagePeriod", e.target.value)} placeholder="例：萌芽期～幼果期" />
@@ -175,8 +273,8 @@ function MaterialModal({ material, title, onClose }: { material: Material; title
         <Field label="禁用時間（紅字提醒）" hint={m.bannedPeriod && <span className="flex items-center gap-1 font-semibold text-red-600"><AlertTriangle size={12} />{m.bannedPeriod}</span>}>
           <Input value={m.bannedPeriod} onChange={(e) => set("bannedPeriod", e.target.value)} placeholder="例：採收前 14 天禁用" className="text-red-600" />
         </Field>
-        <Field label="照片" group>
-          <PhotoUpload folder="materials" max={1} value={m.photo ? [m.photo] : []} onChange={(v) => set("photo", v[0] ?? "")} />
+        <Field label={meta.maxPhotos > 1 ? "照片（可上傳多張）" : "照片"} group>
+          <PhotoUpload folder="materials" max={meta.maxPhotos} value={m.photos ?? []} onChange={(v) => set("photos", v)} />
         </Field>
         <Field
           label="購買地"

@@ -24,8 +24,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/[collection]
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/[collection]">) {
   try {
     const name = await collectionOf(ctx);
-    assertCode(name, "create", codeFromHeaders(req.headers));
-    return NextResponse.json(await createDoc(name, await readJson(req)), { status: 201 });
+    const body = await readJson(req);
+    assertCode(name, "create", codeFromHeaders(req.headers), [body]);
+    return NextResponse.json(await createDoc(name, body), { status: 201 });
   } catch (err) {
     return handleError(err);
   }

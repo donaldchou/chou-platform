@@ -22,13 +22,13 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
   }
 }
 
-/** PUT /api/<collection>/<id> 整筆儲存（不存在時建立；貨源店家新增／修改要帶 x-verify-code） */
+/** PUT /api/<collection>/<id> 整筆儲存（不存在時建立；貨源店家、肥料要帶 x-verify-code） */
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
     const { name, id } = await paramsOf(ctx);
     const { doc, created } = await saveDoc(name, id, await readJson(req), {
-      beforeCreate: () => assertCode(name, "create", codeFromHeaders(req.headers)),
-      beforeUpdate: () => assertCode(name, "update", codeFromHeaders(req.headers)),
+      beforeCreate: (data) => assertCode(name, "create", codeFromHeaders(req.headers), [data]),
+      beforeUpdate: (existing, data) => assertCode(name, "update", codeFromHeaders(req.headers), [existing, data]),
     });
     return NextResponse.json(doc, { status: created ? 201 : 200 });
   } catch (err) {
@@ -36,12 +36,13 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   }
 }
 
-/** DELETE /api/<collection>/<id>?cascade=true（貨源店家要帶 x-verify-code） */
+/** DELETE /api/<collection>/<id>?cascade=true（貨源店家、肥料要帶 x-verify-code） */
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
     const { name, id } = await paramsOf(ctx);
-    assertCode(name, "delete", codeFromHeaders(req.headers));
-    await deleteDoc(name, id, req.nextUrl.searchParams.get("cascade") === "true");
+    await deleteDoc(name, id, req.nextUrl.searchParams.get("cascade") === "true", {
+      beforeDelete: (existing) => assertCode(name, "delete", codeFromHeaders(req.headers), [existing]),
+    });
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     return handleError(err);

@@ -144,9 +144,10 @@ export async function verifyCode(
   collection: Coll,
   action: "create" | "update" | "delete",
   code: string,
+  category?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await api("/api/verify-code", { method: "POST", body: JSON.stringify({ collection, action, code }) });
+    await api("/api/verify-code", { method: "POST", body: JSON.stringify({ collection, action, code, category }) });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

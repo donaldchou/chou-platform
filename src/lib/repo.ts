@@ -44,9 +44,11 @@ function applyMaterialRules(data: Data, existing: Data | null) {
   data.createdAt = existing.createdAt;
   data.updatedAt = today;
   const history = (existing.priceHistory as { date: string; price: number }[]) ?? [];
+  // 原價格是 0（通常是新增時還沒填價格）就不記錄，避免出現「前次 NT$ 0」
+  const oldPrice = Number(existing.price);
   data.priceHistory =
-    Number(data.price) !== Number(existing.price)
-      ? [...history, { date: existing.updatedAt, price: existing.price }]
+    Number(data.price) !== oldPrice && oldPrice > 0
+      ? [...history, { date: existing.updatedAt, price: oldPrice }]
       : history;
 }
 

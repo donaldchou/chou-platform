@@ -43,7 +43,7 @@ const META: Record<MaterialCategory, Meta> = {
   },
   fertilizer: {
     title: "肥料", units: ["ml", "g", "kg"],
-    props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥"],
+    props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥", "高氮肥", "平均肥", "高鉀肥"],
     targetsPlaceholder: "例：氮 15%、磷 15%、鉀 15%", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
   },
   packaging: {
@@ -62,9 +62,19 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
   const [gate, setGate] = useState<{ material: Material | null } | null>(null);
   const [deleting, setDeleting] = useState<Material | null>(null);
   const [code, setCode] = useState<string | undefined>();
-  const list = db.materials
-    .filter((m) => m.category === category)
-    .filter((m) => !q || `${m.nameZh}${m.nameEn}${m.targets}`.toLowerCase().includes(q.toLowerCase()));
+  // 性質篩選：all＝同時符合所有選取的性質，any＝符合任一個
+  const [props, setProps] = useState<string[]>([]);
+  const [mode, setMode] = useState<"all" | "any">("all");
+  const inCategory = db.materials.filter((m) => m.category === category);
+  // 選項：預設選項，加上資料裡實際出現過的其他性質
+  const propOptions = [...new Set([...meta.props, ...inCategory.flatMap((m) => m.properties)])];
+  const list = inCategory
+    .filter((m) => !q || `${m.nameZh}${m.nameEn}${m.targets}`.toLowerCase().includes(q.toLowerCase()))
+    .filter((m) => {
+      if (!props.length) return true;
+      return mode === "all" ? props.every((p) => m.properties.includes(p)) : props.some((p) => m.properties.includes(p));
+    });
+  const filtered = !!q || props.length > 0;
   const supplier = (id: string) => db.suppliers.find((s) => s.id === id);
 
   const create = (): Material => ({
@@ -82,9 +92,73 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
         desc="登錄品項、價格、使用比例與禁用時間；修改價格時會保留歷史價格。"
         action={<Button onClick={startCreate}><Plus size={16} /> 新增{meta.title}</Button>}
       />
-      <div className="relative mb-4 max-w-sm">
-        <Search size={16} className="absolute left-3 top-2.5 text-stone-400" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`搜尋名稱或${targetsLabel}`} className="pl-9" />
+      <div className="mb-4 space-y-3">
+        <div className="relative max-w-sm">
+          <Search size={16} className="absolute left-3 top-2.5 text-stone-400" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`搜尋名稱或${targetsLabel}`} className="pl-9" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="篩選性質">
+          <span className="text-sm font-medium text-stone-600">性質：</span>
+          {propOptions.map((p) => {
+            const on = props.includes(p);
+            const count = inCategory.filter((m) => m.properties.includes(p)).length;
+            return (
+              <button
+                key={p}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setProps(on ? props.filter((x) => x !== p) : [...props, p])}
+                className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                  on
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : count
+                      ? "border-stone-300 bg-white text-stone-700 hover:border-emerald-500"
+                      : "border-stone-200 bg-white text-stone-400 hover:border-stone-300"
+                }`}
+              >
+                {p}
+                <span className={`ml-1 text-xs ${on ? "text-emerald-100" : "text-stone-400"}`}>({count})</span>
+              </button>
+            );
+          })}
+        </div>
+        {filtered && (
+          <div className="flex flex-wrap items-center gap-3 text-sm text-stone-600">
+            <span>
+              顯示 <b className="text-stone-900">{list.length}</b> / 全部 {inCategory.length} 筆
+            </span>
+            {props.length > 1 && (
+              <div className="flex rounded-lg border border-stone-300 bg-white p-0.5 text-xs" role="group" aria-label="篩選方式">
+                {(
+                  [
+                    ["all", "同時符合"],
+                    ["any", "符合任一"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={mode === v}
+                    onClick={() => setMode(v)}
+                    className={`rounded-md px-2.5 py-1 ${mode === v ? "bg-emerald-700 text-white" : "text-stone-600 hover:bg-stone-100"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setQ("");
+                setProps([]);
+              }}
+              className="text-emerald-700 underline"
+            >
+              清除篩選
+            </button>
+          </div>
+        )}
       </div>
       <Table head={["", "名稱", "規格／價格", "使用比例", targetsLabel, "性質", "使用時間", "禁用時間", "購買地", ""]}>
         {list.map((m) => {
@@ -123,7 +197,7 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
             </tr>
           );
         })}
-        {!list.length && <tr><Td colSpan={10} className="py-8 text-center text-stone-400">沒有資料</Td></tr>}
+        {!list.length && <tr><Td colSpan={10} className="py-8 text-center text-stone-400">{filtered ? "沒有符合篩選條件的資料" : "沒有資料"}</Td></tr>}
       </Table>
 
       {gate && (
@@ -245,7 +319,7 @@ function MaterialModal({
           <Input value={m.dilution} onChange={(e) => set("dilution", e.target.value)} placeholder="例：2000" />
         </Field>
       </div>
-      {!isNew && m.price !== material.price && (
+      {!isNew && m.price !== material.price && material.price > 0 && (
         <p className="mt-2 text-xs text-amber-700">儲存後，原價格 {money(material.price)} 會記錄到歷史價格。</p>
       )}
       {m.priceHistory.length > 0 && (

@@ -5,7 +5,7 @@ import { Plus, Trees, Zap } from "lucide-react";
 import { useDB } from "@/lib/store";
 import { Badge, Button, Empty, PageHeader } from "@/components/ui";
 import { FRUITS } from "@/lib/types";
-import { contractStatus, orchardArea, orchardTrees } from "@/lib/utils";
+import { contractStatus, orchardArea, orchardTrees, photoSrc } from "@/lib/utils";
 
 export default function OrchardsPage() {
   const db = useDB();
@@ -39,7 +39,7 @@ export default function OrchardsPage() {
                 <div className="relative h-36 bg-gradient-to-br from-emerald-600 to-lime-500">
                   {o.photos[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={o.photos[0]} alt="" className="h-full w-full object-cover" />
+                    <img src={photoSrc(o.photos[0])} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <Trees className="absolute bottom-3 right-4 text-white/40" size={64} />
                   )}

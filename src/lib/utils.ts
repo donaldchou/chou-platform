@@ -99,24 +99,39 @@ export function materialCost(m: Material | undefined, amount: number) {
 export const materialName = (m?: Material) =>
   m ? `${m.nameZh}${m.nameEn ? ` (${m.nameEn})` : ""}` : "（已刪除）";
 
-/** Downscale an image file to a JPEG data URL so it fits in localStorage. */
-export function fileToDataUrl(file: File, max = 1024): Promise<string> {
+/** 在瀏覽器把照片縮小並轉成 JPEG，減少上傳時間與儲存空間 */
+export function compressImage(file: File, max = 1600): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.75));
-      };
-      img.src = reader.result as string;
+    const src = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => {
+      URL.revokeObjectURL(src);
+      reject(new Error("無法讀取這張圖片"));
     };
-    reader.readAsDataURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(src);
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("圖片壓縮失敗"))), "image/jpeg", 0.8);
+    };
+    img.src = src;
   });
+}
+
+/** 把 MongoDB 中的 Blob 檔案網址轉成 <img> 可用的網址（私人 store 要經過 /api/photo） */
+export const photoSrc = (url: string) =>
+  url.includes(".blob.vercel-storage.com/") ? `/api/photo?url=${encodeURIComponent(url)}` : url;
+
+/** 上傳照片到 Vercel Blob（經由 /api/upload），回傳照片網址 */
+export async function uploadPhoto(file: File, folder = "photos"): Promise<string> {
+  const form = new FormData();
+  form.append("file", await compressImage(file), "photo.jpg");
+  form.append("folder", folder);
+  const res = await fetch("/api/upload", { method: "POST", body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `上傳失敗（HTTP ${res.status}）`);
+  return data.url as string;
 }

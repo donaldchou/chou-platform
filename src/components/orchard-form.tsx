@@ -41,7 +41,7 @@ export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boole
             <Input value={o.nameEn} onChange={(e) => set("nameEn", e.target.value)} placeholder="e.g. Lishan No.1" />
           </Field>
           <Field label="果園照片" group className="sm:col-span-2">
-            <PhotoUpload value={o.photos} onChange={(v) => set("photos", v)} />
+            <PhotoUpload folder="orchards" value={o.photos} onChange={(v) => set("photos", v)} />
           </Field>
         </div>
       </Card>
@@ -152,7 +152,7 @@ export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boole
               <Input type="date" value={o.contract.end} onChange={(e) => set("contract", { ...o.contract, end: e.target.value })} />
             </Field>
             <Field label="合約照片" group className="sm:col-span-2">
-              <PhotoUpload value={o.contract.photos} onChange={(v) => set("contract", { ...o.contract, photos: v })} />
+              <PhotoUpload folder="contracts" value={o.contract.photos} onChange={(v) => set("contract", { ...o.contract, photos: v })} />
             </Field>
           </div>
         </Card>

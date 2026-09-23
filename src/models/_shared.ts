@@ -31,5 +31,7 @@ export const BENTO_MODES = ["便當", "餐費補貼"] as const;
 
 export function defineModel(name: string, schema: Schema, collection: string): Model<unknown> {
   schema.set("versionKey", false);
-  return (mongoose.models[name] as Model<unknown>) ?? mongoose.model(name, schema, collection);
+  // dev 模式 hot reload 後 schema 可能已經改了，要重新註冊，否則新欄位會被當成未知欄位丟掉
+  if (mongoose.models[name]) mongoose.deleteModel(name);
+  return mongoose.model(name, schema, collection) as unknown as Model<unknown>;
 }

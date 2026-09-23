@@ -176,7 +176,7 @@ function MaterialModal({ material, title, onClose }: { material: Material; title
           <Input value={m.bannedPeriod} onChange={(e) => set("bannedPeriod", e.target.value)} placeholder="例：採收前 14 天禁用" className="text-red-600" />
         </Field>
         <Field label="照片" group>
-          <PhotoUpload max={1} value={m.photo ? [m.photo] : []} onChange={(v) => set("photo", v[0] ?? "")} />
+          <PhotoUpload folder="materials" max={1} value={m.photo ? [m.photo] : []} onChange={(v) => set("photo", v[0] ?? "")} />
         </Field>
         <Field
           label="購買地"

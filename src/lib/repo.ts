@@ -3,6 +3,7 @@ import { connectDB } from "./mongodb";
 import { COLLECTIONS, FILTERS, ORCHARD_CHILDREN, SORT, type CollectionName } from "./collections";
 import { HttpError, fromClient, toClient } from "./api";
 import { todayStr, uid } from "./utils";
+import { assertNoInlineImages, collectBlobUrls, deleteBlobs } from "./blob";
 import type { DB } from "./types";
 import { OrchardModel } from "@/models/orchard";
 import { EmployeeModel } from "@/models/people";
@@ -80,6 +81,7 @@ export async function createDoc(name: CollectionName, body: Data) {
   const id = typeof body.id === "string" && body.id ? body.id : uid();
   if (await Model.exists({ _id: id })) throw new HttpError(409, "這個 id 已經存在");
   const data = fromClient(body);
+  assertNoInlineImages(data);
   await checkRefs(name, data);
   if (name === "materials") applyMaterialRules(data, null);
   const doc = await Model.create({ ...data, _id: id });
@@ -87,19 +89,31 @@ export async function createDoc(name: CollectionName, body: Data) {
 }
 
 /** PUT：存在就整筆覆寫，不存在就建立（前端的新增與編輯共用） */
-export async function saveDoc(name: CollectionName, id: string, body: Data) {
+export async function saveDoc(
+  name: CollectionName,
+  id: string,
+  body: Data,
+  opts: { beforeCreate?: () => void; beforeUpdate?: () => void } = {},
+) {
   await connectDB();
   const Model = COLLECTIONS[name];
   const data = fromClient(body);
+  assertNoInlineImages(data);
   await checkRefs(name, data);
   const doc = await Model.findById(id);
   if (name === "materials") applyMaterialRules(data, doc ? (doc.toObject() as Data) : null);
   if (!doc) {
+    opts.beforeCreate?.(); // 例如檢查新增用的驗證碼
     const created = await Model.create({ ...data, _id: id });
     return { doc: toClient(created.toObject()), created: true };
   }
+  opts.beforeUpdate?.(); // 例如檢查修改用的驗證碼
+  const before = collectBlobUrls(doc.toObject());
   doc.overwrite(data);
   await doc.save();
+  // 刪掉這次編輯移除的照片
+  const after = collectBlobUrls(data);
+  await deleteBlobs([...before].filter((u) => !after.has(u)));
   return { doc: toClient(doc.toObject()), created: false };
 }
 
@@ -107,7 +121,9 @@ export async function saveDoc(name: CollectionName, id: string, body: Data) {
 export async function deleteDoc(name: CollectionName, id: string, cascade: boolean) {
   await connectDB();
   const Model = COLLECTIONS[name];
-  if (!(await Model.exists({ _id: id }))) throw new HttpError(404, "找不到資料");
+  const existing = await Model.findById(id).lean();
+  if (!existing) throw new HttpError(404, "找不到資料");
+  const photos = collectBlobUrls(existing);
 
   if (name === "orchards") {
     const counts = Object.fromEntries(
@@ -122,10 +138,14 @@ export async function deleteDoc(name: CollectionName, id: string, cascade: boole
         counts,
       });
     }
+    for (const c of ORCHARD_CHILDREN) {
+      collectBlobUrls(await COLLECTIONS[c].find({ orchardId: id }).lean(), photos);
+    }
     await Promise.all(ORCHARD_CHILDREN.map((c) => COLLECTIONS[c].deleteMany({ orchardId: id })));
   }
 
   await Model.deleteOne({ _id: id });
+  await deleteBlobs(photos);
 }
 
 /** 一次取得全部資料（前端啟動時載入） */
@@ -138,15 +158,4 @@ export async function loadAll(): Promise<DB> {
     }),
   );
   return Object.fromEntries(entries) as unknown as DB;
-}
-
-/** 清空並寫入示範資料 */
-export async function resetAll(seed: DB) {
-  await connectDB();
-  for (const name of Object.keys(COLLECTIONS) as CollectionName[]) {
-    const Model = COLLECTIONS[name];
-    await Model.deleteMany({});
-    const docs = (seed[name] as unknown as Data[]).map((d) => ({ ...fromClient(d), _id: d.id }));
-    if (docs.length) await Model.insertMany(docs);
-  }
 }

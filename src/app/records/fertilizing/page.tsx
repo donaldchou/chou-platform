@@ -172,7 +172,7 @@ function FertModal({ record, onClose }: { record: FertilizingRecord; onClose: ()
         <TargetPicker value={r.targets} other={r.otherTarget} onChange={(v) => set("targets", v)} onOther={(v) => set("otherTarget", v)} />
         <EmployeePicker value={r.employeeIds} onChange={(v) => set("employeeIds", v)} />
         <Field label="參考照片（提供給員工）" group>
-          <PhotoUpload value={r.photos} onChange={(v) => set("photos", v)} />
+          <PhotoUpload folder="fertilizing" value={r.photos} onChange={(v) => set("photos", v)} />
         </Field>
         <Field label="備註">
           <Textarea value={r.note} onChange={(e) => set("note", e.target.value)} />

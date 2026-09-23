@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Pencil, Trash2, X } from "lucide-react";
-import { fileToDataUrl } from "@/lib/utils";
+import { photoSrc, uploadPhoto } from "@/lib/utils";
 
 export const inputCls =
   "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 disabled:bg-stone-100";
@@ -301,10 +301,13 @@ export function PhotoUpload({
   value,
   onChange,
   max = 8,
+  folder = "photos",
 }: {
   value: string[];
   onChange: (v: string[]) => void;
   max?: number;
+  /** Vercel Blob 裡的資料夾名稱，例如 orchards、bills */
+  folder?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -313,11 +316,14 @@ export function PhotoUpload({
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
-    const urls = await Promise.all(
-      [...files].slice(0, max - value.length).map((f) => fileToDataUrl(f)),
+    const results = await Promise.allSettled(
+      [...files].slice(0, max - value.length).map((f) => uploadPhoto(f, folder)),
     );
     setBusy(false);
-    onChange([...value, ...urls]);
+    const urls = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+    const failed = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+    if (urls.length) onChange([...value, ...urls]);
+    if (failed.length) alert(`${failed.length} 張照片上傳失敗：${failed[0].reason?.message ?? failed[0].reason}`);
     if (ref.current) ref.current.value = "";
   }
 
@@ -326,7 +332,7 @@ export function PhotoUpload({
       {value.map((src, i) => (
         <div key={i} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-stone-200">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="" className="h-full w-full cursor-zoom-in object-cover" onClick={() => setPreview(src)} />
+          <img src={photoSrc(src)} alt="" className="h-full w-full cursor-zoom-in object-cover" onClick={() => setPreview(src)} />
           <button
             type="button"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
@@ -341,10 +347,11 @@ export function PhotoUpload({
         <button
           type="button"
           onClick={() => ref.current?.click()}
-          className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-stone-300 text-xs text-stone-500 hover:border-emerald-500 hover:text-emerald-700"
+          disabled={busy}
+          className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-stone-300 text-xs text-stone-500 hover:border-emerald-500 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60"
         >
           <ImagePlus size={20} />
-          {busy ? "處理中…" : "上傳照片"}
+          {busy ? "上傳中…" : "上傳照片"}
         </button>
       )}
       <input
@@ -364,7 +371,7 @@ export function Lightbox({ src, onClose }: { src: string; onClose: () => void })
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" className="max-h-full max-w-full rounded-lg" />
+      <img src={photoSrc(src)} alt="" className="max-h-full max-w-full rounded-lg" />
     </div>
   );
 }
@@ -376,7 +383,7 @@ export function Thumb({ src, className = "h-10 w-10" }: { src?: string; classNam
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
+        src={photoSrc(src)}
         alt=""
         onClick={() => setOpen(true)}
         className={`${className} cursor-zoom-in rounded-md object-cover`}
@@ -433,13 +440,28 @@ export function Td({
 }
 
 /** Edit / delete buttons for a table row. */
-export function RowActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+export function RowActions({
+  onEdit,
+  onDelete,
+  confirm = true,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+  /** false：不跳出瀏覽器確認框（由 onDelete 自己處理，例如驗證碼對話框） */
+  confirm?: boolean;
+}) {
   return (
     <div className="flex justify-end">
       <Button size="sm" variant="ghost" onClick={onEdit} title="編輯">
         <Pencil size={14} />
       </Button>
-      <Button size="sm" variant="ghost" className="text-red-600" onClick={() => confirmDelete() && onDelete()} title="刪除">
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-red-600"
+        onClick={() => (!confirm || confirmDelete()) && onDelete()}
+        title="刪除"
+      >
         <Trash2 size={14} />
       </Button>
     </div>

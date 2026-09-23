@@ -254,7 +254,7 @@ function SalaryModal({ salary, onClose }: { salary: Salary; onClose: () => void 
           <Input value={s.note} onChange={(e) => setS({ ...s, note: e.target.value })} />
         </Field>
         <Field label="照片" group className="sm:col-span-2">
-          <PhotoUpload value={s.photos} onChange={(v) => setS({ ...s, photos: v })} />
+          <PhotoUpload folder="salaries" value={s.photos} onChange={(v) => setS({ ...s, photos: v })} />
         </Field>
       </div>
     </Modal>

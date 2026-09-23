@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { HttpError, handleError, readJson } from "@/lib/api";
+import { assertCode, codeFromHeaders } from "@/lib/codes";
 import { isCollection } from "@/lib/collections";
 import { createDoc, listDocs } from "@/lib/repo";
 
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/[collection]
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/[collection]">) {
   try {
     const name = await collectionOf(ctx);
+    assertCode(name, "create", codeFromHeaders(req.headers));
     return NextResponse.json(await createDoc(name, await readJson(req)), { status: 201 });
   } catch (err) {
     return handleError(err);

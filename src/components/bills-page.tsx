@@ -114,6 +114,7 @@ export function BillsPage({ kind }: { kind: BillKind }) {
           )}
           <Field label={kind === "water" ? "水塔管線照片" : "電號照片（電表／電費單）"} group>
             <PhotoUpload
+              folder="orchards"
               value={kind === "water" ? orchard.waterPipePhotos : orchard.electricityPhotos}
               onChange={(v) =>
                 upsert("orchards", kind === "water" ? { ...orchard, waterPipePhotos: v } : { ...orchard, electricityPhotos: v })
@@ -233,7 +234,7 @@ function BillModal({ bill, onClose, title }: { bill: Bill; onClose: () => void; 
           <Input value={b.note} onChange={(e) => setB({ ...b, note: e.target.value })} />
         </Field>
         <Field label="繳費單照片" group className="sm:col-span-2">
-          <PhotoUpload value={b.photos} onChange={(v) => setB({ ...b, photos: v })} />
+          <PhotoUpload folder="bills" value={b.photos} onChange={(v) => setB({ ...b, photos: v })} />
         </Field>
       </div>
     </Modal>

@@ -77,12 +77,20 @@ export interface Worker {
   dailyRate: number;
 }
 
+export const SUPPLIER_CONTACTS = 3;
+
+export interface SupplierContact {
+  name: string;
+  phone: string;
+}
+
 export interface Supplier {
   id: ID;
   name: string;
-  phone: string;
+  phone: string; // 店家電話
+  contacts: SupplierContact[]; // 聯絡人，最多 3 組
   address: string;
-  cardPhoto: string;
+  cardPhotos: string[]; // 名片（可多張）
   note: string;
 }
 

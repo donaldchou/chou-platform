@@ -64,13 +64,17 @@ function replaceItem<K extends Coll>(db: DB, key: K, item: Item<K>): DB {
   return { ...db, [key]: exists ? list.map((x) => (x.id === item.id ? item : x)) : [item, ...list] };
 }
 
-/** 新增或更新一筆資料，回傳是否成功 */
-export async function upsert<K extends Coll>(key: K, item: Item<K>): Promise<boolean> {
+const codeHeader = (code?: string): Record<string, string> =>
+  code === undefined ? {} : { "x-verify-code": encodeURIComponent(code) };
+
+/** 新增或更新一筆資料，回傳是否成功。需要驗證碼的操作（例如貨源店家）要帶 code。 */
+export async function upsert<K extends Coll>(key: K, item: Item<K>, opts: { code?: string } = {}): Promise<boolean> {
   const prev = state;
   setLocal(replaceItem(state, key, item));
   try {
     const saved = await api<Item<K>>(`/api/${key}/${encodeURIComponent(item.id)}`, {
       method: "PUT",
+      headers: codeHeader(opts.code),
       body: JSON.stringify(item),
     });
     // 以後端回傳的資料為準（例如資材的價格歷史由後端維護）
@@ -114,13 +118,38 @@ export async function remove<K extends Coll>(key: K, id: string): Promise<boolea
   }
 }
 
-/** 清空資料庫並寫入示範資料 */
-export async function resetDemo() {
+/**
+ * 需要驗證碼的刪除（例如貨源店家）。等後端確認驗證碼正確後才從畫面移除，
+ * 驗證碼錯誤時回傳錯誤訊息，讓對話框顯示。
+ */
+export async function removeWithCode<K extends Coll>(
+  key: K,
+  id: string,
+  code: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const db = await api<DB>("/api/seed", { method: "POST", body: JSON.stringify({ confirm: "RESET" }) });
-    setLocal(db);
+    await api(`/api/${key}/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: codeHeader(code),
+    });
+    setLocal({ ...state, [key]: (state[key] as Item<K>[]).filter((x) => x.id !== id) });
+    return { ok: true };
   } catch (e) {
-    alert(`重設失敗：${e instanceof Error ? e.message : e}`);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 只檢查驗證碼是否正確（不會修改資料） */
+export async function verifyCode(
+  collection: Coll,
+  action: "create" | "update" | "delete",
+  code: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await api("/api/verify-code", { method: "POST", body: JSON.stringify({ collection, action, code }) });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 

@@ -1,13 +1,22 @@
 import { Schema } from "mongoose";
-import { defineModel, idField, money, str, sub, ymd } from "./_shared";
+import { SUPPLIER_CONTACTS } from "@/lib/types";
+import { defineModel, idField, money, photos, str, sub, ymd } from "./_shared";
 
 /** 貨源店家 */
 const SupplierSchema = new Schema({
   _id: idField,
   name: { type: String, required: [true, "請填寫店家名稱"], trim: true },
-  phone: str,
+  phone: str, // 店家電話
+  contacts: {
+    type: [new Schema({ name: str, phone: str }, sub)],
+    default: [],
+    validate: {
+      validator: (v: unknown[]) => v.length <= SUPPLIER_CONTACTS,
+      message: `聯絡人最多 ${SUPPLIER_CONTACTS} 組`,
+    },
+  },
   address: str,
-  cardPhoto: str, // 名片
+  cardPhotos: photos, // 名片（可多張）
   note: str,
 });
 

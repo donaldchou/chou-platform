@@ -16,10 +16,10 @@ npm run dev
 
 ```
 MONGODB_URI=mongodb+srv://...     # 必填
+BLOB_READ_WRITE_TOKEN=...         # 必填，照片存放（Vercel Blob，private store）
 GEMINI_API_KEY=...                # 選填，噴藥 AI 建議；沒設定時使用內建建議
+SUPPLIER_CODE=...                 # 必填，新增／編輯／刪除貨源店家時要輸入的驗證碼
 ```
-
-第一次使用可以按側欄的「重設示範資料」，或呼叫 `POST /api/seed` 寫入示範資料。
 
 ## 程式結構
 
@@ -46,7 +46,7 @@ GEMINI_API_KEY=...                # 選填，噴藥 AI 建議；沒設定時使�
 | `fertilizing` | Fertilizing | 施肥：肥料與每棵樹用量、包數、對象、員工、參考照片 |
 | `spraying` | Spraying | 噴藥：用水量、藥品（陣列順序＝加入順序）、對象、AI 建議 |
 | `labor` | Labor | 剪枝／砍草（`kind`: pruning / weeding）：外請工人日薪、進場紀錄、工資結算 |
-| `suppliers` | Supplier | 貨源店家 |
+| `suppliers` | Supplier | 貨源店家：店家電話、聯絡人與電話（最多 3 組）、地址、名片（多張） |
 | `materials` | Material | 農藥／肥料／包材（`category`），含歷史價格 |
 | `workers` | Worker | 外請工人 |
 | `employees` | Employee | 自己員工 |
@@ -74,19 +74,23 @@ GEMINI_API_KEY=...                # 選填，噴藥 AI 建議；沒設定時使�
 - **關聯檢查**：紀錄的 `orchardId`、薪水／分紅／工作的 `employeeId` 必須存在。
 - **資材價格歷史**：價格變動時，後端自動把舊價格加進 `priceHistory`，並更新「資訊異動時間」。
 - **刪除果園**：底下還有紀錄時回 409 和各類紀錄筆數；帶 `?cascade=true` 才會一併刪除。
+- **新增／編輯／刪除貨源店家**：必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），與 `SUPPLIER_CODE` 相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
+- **照片**：瀏覽器先壓縮成 JPEG（最長邊 1600px），上傳到 Vercel Blob 的 `chou-platform/<folder>/`，MongoDB 只存檔案網址（base64 會被拒絕）。編輯時移除的照片、刪除資料（含果園連帶刪除的紀錄）時的照片，會自動從 Blob 刪除。
 
 ### 其他
 
 | 方法 | 路徑 | 說明 |
 |---|---|---|
+| POST | `/api/upload` | 上傳照片（multipart：`file`、`folder`），回傳 `{ url }` |
+| GET | `/api/photo?url=` | 讀取照片（private store 不能直接開啟網址） |
+| POST | `/api/verify-code` | 只檢查驗證碼，body：`{ collection, action: "create" \| "update" \| "delete", code }` |
 | GET | `/api/db` | 一次取得所有資料（前端啟動時使用） |
 | GET | `/api/health` | 檢查資料庫連線 |
 | GET | `/api/reminders?days=90` | 合約到期（預設 3 個月內）、逾期工作、有禁用期的資材、待完成事項；可給排程推播用 |
 | GET | `/api/stats/bills?kind=water&year=2026&orchardId=o1` | 水電費每月、歷年、各果園統計 |
 | POST | `/api/ai/spray-advice` | 噴藥 AI 建議，body：`{ stage, targets, waterLiters, materialIds }` |
-| POST | `/api/seed` | 清空並寫入示範資料，body 必須是 `{ "confirm": "RESET" }` |
 
 ## 尚未實作
 
 - 登入與權限：目前任何能連到網站的人都能讀寫資料
-- 照片目前以壓縮後的 base64 存在文件中（單一文件上限 16MB）；照片多時建議改存 Vercel Blob 等物件儲存
+- 上傳照片後按「取消」不儲存，已上傳的照片會留在 Blob 中（未被任何資料使用）

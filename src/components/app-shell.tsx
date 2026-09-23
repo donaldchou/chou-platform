@@ -14,7 +14,6 @@ import {
   Leaf,
   Menu,
   Package,
-  RotateCcw,
   Scissors,
   ShoppingBasket,
   SprayCan,
@@ -26,7 +25,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { reload, resetDemo, useDBStatus } from "@/lib/store";
+import { reload, useDBStatus } from "@/lib/store";
 
 const NAV = [
   {
@@ -108,17 +107,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ))}
       </div>
       <div className="border-t border-emerald-800 p-3">
-        <div className="mb-2 flex items-center gap-2 px-2 text-sm text-emerald-100">
+        <div className="flex items-center gap-2 px-2 text-sm text-emerald-100">
           <UserRound size={16} /> 農場管理者
         </div>
-        <button
-          onClick={() => {
-            if (confirm("會清空資料庫中的所有資料，並寫入示範資料。確定嗎？")) void resetDemo();
-          }}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-emerald-200/80 hover:bg-emerald-800/70"
-        >
-          <RotateCcw size={14} /> 重設示範資料
-        </button>
       </div>
     </nav>
   );

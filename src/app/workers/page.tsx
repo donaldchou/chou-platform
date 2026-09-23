@@ -117,7 +117,7 @@ function WorkerModal({ worker, onClose }: { worker: Worker; onClose: () => void 
           <Input value={w.createdAt} disabled />
         </Field>
         <Field label="照片" group>
-          <PhotoUpload max={1} value={w.photo ? [w.photo] : []} onChange={(v) => setW({ ...w, photo: v[0] ?? "" })} />
+          <PhotoUpload folder="workers" max={1} value={w.photo ? [w.photo] : []} onChange={(v) => setW({ ...w, photo: v[0] ?? "" })} />
         </Field>
       </div>
     </Modal>

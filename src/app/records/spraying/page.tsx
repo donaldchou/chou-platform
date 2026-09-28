@@ -33,8 +33,8 @@ export default function SprayingPage() {
         action={<Button onClick={() => setEditing(create())}><Plus size={16} /> 新增噴藥紀錄</Button>}
       />
       <RecordsToolbar {...filter} count={`共 ${list.length} 筆噴藥紀錄`} />
-      {view === "calendar" ? (
-        <RecordCalendar year={year} />
+      {view !== "list" ? (
+        <RecordCalendar year={year} layout={view} />
       ) : (
         <Table head={["施用日期時間", "果園", "用水量", "配方（加入順序）", "對象", "費用", "員工", ""]}>
           {list.map((r) => (

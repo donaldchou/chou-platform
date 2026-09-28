@@ -33,8 +33,8 @@ export default function FertilizingPage() {
         action={<Button onClick={() => setEditing(create())}><Plus size={16} /> 新增施肥紀錄</Button>}
       />
       <RecordsToolbar {...filter} count={`共 ${list.length} 筆施肥紀錄`} />
-      {view === "calendar" ? (
-        <RecordCalendar year={year} />
+      {view !== "list" ? (
+        <RecordCalendar year={year} layout={view} />
       ) : (
         <Table head={["施用日期時間", "果園", "肥料", "對象", "總包數", "費用", "員工", ""]}>
           {list.map((r) => {

@@ -10,7 +10,13 @@ type Rec = SprayingRecord | FertilizingRecord;
 type Entry = { name: string; rate: string };
 
 /** 同一天的施用（可能有好幾筆紀錄，點日期時開啟第一筆） */
-type Day = { date: string; entries: Entry[]; record?: Rec };
+type Day = { date: string; tone: Tone; entries: Entry[]; record?: Rec };
+
+/** pest＝農藥日期（藍）、fert＝肥料日期（橘） */
+type Tone = "pest" | "fert";
+
+/** 日曆：果園在中間、左農藥右肥料；月曆：果園在左、1～12 月各一欄 */
+export type CalendarLayout = "calendar" | "month";
 
 export type OpenRecord = { kind: "spraying"; record: SprayingRecord } | { kind: "fertilizing"; record: FertilizingRecord };
 
@@ -43,8 +49,8 @@ function fertEntry(item: FertilizingRecord["items"][number], m?: Material): Entr
   return { name: m?.nameZh ?? "（已刪除）", rate };
 }
 
-function addDay(days: Map<string, Day>, date: string, entries: Entry[], record: Rec) {
-  const d = days.get(date) ?? { date, entries: [] };
+function addDay(days: Map<string, Day>, tone: Tone, date: string, entries: Entry[], record: Rec) {
+  const d = days.get(date) ?? { date, tone, entries: [] };
   for (const e of entries) {
     if (!d.entries.some((x) => x.name === e.name && x.rate === e.rate)) d.entries.push(e);
   }
@@ -57,14 +63,16 @@ const sorted = (days: Map<string, Day>) => [...days.values()].sort((a, b) => a.d
 /** 1/11 這種月/日格式 */
 const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
-/**
- * 噴藥、施肥日期對照表：依果樹種類分組，中間是果園，左邊農藥噴灑日期、右邊肥料施用日期。
- * 噴藥紀錄裡有農藥就算農藥日期、有肥料（葉面肥）就算肥料日期；施肥紀錄都算肥料日期。
- */
-/** 點日期時傳出同一格（同果園、同果樹、同欄）的所有紀錄與點到的位置 */
+/** 點日期時傳出可前後切換的紀錄（日曆：同一格；月曆：同一列）與點到的位置 */
 export type OnOpen = (list: OpenRecord[], index: number) => void;
 
-export function SprayCalendar({ year, onOpen }: { year: number; onOpen: OnOpen }) {
+const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+/**
+ * 噴藥、施肥日期對照表，依果樹種類分組列出果園。
+ * 噴藥紀錄裡有農藥就算農藥日期、有肥料（葉面肥）就算肥料日期；施肥紀錄都算肥料日期。
+ */
+export function SprayCalendar({ year, layout, onOpen }: { year: number; layout: CalendarLayout; onOpen: OnOpen }) {
   const db = useDB();
   const mat = (id: string) => db.materials.find((m) => m.id === id);
   const inYear = (r: Rec) => r.datetime.startsWith(String(year));
@@ -77,7 +85,7 @@ export function SprayCalendar({ year, onOpen }: { year: number; onOpen: OnOpen }
     // 先放施肥紀錄，同一天也有葉面肥噴藥時，點肥料日期優先開啟施肥紀錄
     for (const r of fertilizing) {
       if (r.orchardId !== orchardId || !coversFruit(r, fruit)) continue;
-      addDay(fert, r.datetime.slice(0, 10), r.items.map((i) => fertEntry(i, mat(i.materialId))), r);
+      addDay(fert, "fert", r.datetime.slice(0, 10), r.items.map((i) => fertEntry(i, mat(i.materialId))), r);
     }
     for (const r of spraying) {
       if (r.orchardId !== orchardId || !coversFruit(r, fruit)) continue;
@@ -89,8 +97,8 @@ export function SprayCalendar({ year, onOpen }: { year: number; onOpen: OnOpen }
       const p = used.filter((u) => u.m.category === "pesticide").map((u) => u.e);
       const f = used.filter((u) => u.m.category === "fertilizer").map((u) => u.e);
       // 還沒加入藥品的噴藥紀錄仍算噴藥日期
-      if (p.length || !f.length) addDay(pest, date, p, r);
-      if (f.length) addDay(fert, date, f, r);
+      if (p.length || !f.length) addDay(pest, "pest", date, p, r);
+      if (f.length) addDay(fert, "fert", date, f, r);
     }
     return { pest: sorted(pest), fert: sorted(fert) };
   }
@@ -102,12 +110,67 @@ export function SprayCalendar({ year, onOpen }: { year: number; onOpen: OnOpen }
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-stone-500">滑鼠移到日期上可看使用的藥品／肥料與倍數；點日期可開啟該筆噴藥／施肥紀錄。</p>
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
+        {layout === "month" && (
+          <>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-sky-200 ring-1 ring-inset ring-sky-400" />農藥</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-inset ring-amber-400" />肥料</span>
+          </>
+        )}
+        滑鼠移到日期上可看使用的藥品／肥料與倍數；點日期可開啟該筆噴藥／施肥紀錄。
+      </p>
 
       {!groups.length ? (
         <p className="rounded-xl border border-stone-200 bg-white py-8 text-center text-sm text-stone-400">
           尚無果園或果園未登錄果樹株數
         </p>
+      ) : layout === "month" ? (
+        <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white shadow-sm">
+          <table className="w-full min-w-[1100px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-36" />
+              {MONTHS.map((m) => <col key={m} />)}
+            </colgroup>
+            <thead className="bg-stone-50 text-xs text-stone-500">
+              <tr>
+                <th rowSpan={2} className="sticky left-0 z-10 border-r border-stone-200 bg-stone-50 px-3 py-2 text-left font-medium">
+                  果園名稱
+                </th>
+                <th colSpan={12} className="border-b border-stone-200 px-3 py-2 text-left font-medium">農藥／肥料噴灑日期</th>
+              </tr>
+              <tr>
+                {MONTHS.map((m) => (
+                  <th key={m} className="border-l border-stone-100 px-1 py-2 text-center font-medium">{m}月</th>
+                ))}
+              </tr>
+            </thead>
+            {groups.map(({ fruit, orchards }) => (
+              <tbody key={fruit} className="divide-y divide-stone-100 border-t-2 border-stone-300">
+                <tr className="bg-emerald-50/60">
+                  <td className="sticky left-0 z-10 border-r border-stone-200 bg-emerald-50 px-3 py-2 font-bold text-emerald-800">{fruit}</td>
+                  <td colSpan={12} />
+                </tr>
+                {orchards.map((o) => {
+                  const { pest, fert } = datesFor(o.id, fruit);
+                  // 整列依日期排序，檢視視窗可在這座果園全年的噴藥、施肥之間切換
+                  const row = [...pest, ...fert].sort((a, b) => a.date.localeCompare(b.date) || a.tone.localeCompare(b.tone));
+                  return (
+                    <tr key={o.id} className="hover:bg-stone-50">
+                      <td className="sticky left-0 z-10 border-r border-stone-200 bg-white px-3 py-2 pl-6 font-medium text-stone-800">
+                        {o.nameZh}
+                      </td>
+                      {MONTHS.map((m) => (
+                        <td key={m} className="border-l border-stone-100 p-1 align-top">
+                          <Dates days={row.filter((d) => Number(d.date.slice(5, 7)) === m)} nav={row} onOpen={onOpen} empty="" />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            ))}
+          </table>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white shadow-sm">
           <table className="w-full min-w-[640px] table-fixed text-sm">
@@ -134,9 +197,9 @@ export function SprayCalendar({ year, onOpen }: { year: number; onOpen: OnOpen }
                   const { pest, fert } = datesFor(o.id, fruit);
                   return (
                     <tr key={o.id} className="hover:bg-stone-50">
-                      <td className="px-4 py-3 align-middle"><Dates days={pest} tone="pest" onOpen={onOpen} /></td>
+                      <td className="px-4 py-3 align-middle"><Dates days={pest} onOpen={onOpen} /></td>
                       <td className="border-x border-stone-200 px-4 py-3 text-center font-medium text-stone-800">{o.nameZh}</td>
-                      <td className="px-4 py-3 align-middle"><Dates days={fert} tone="fert" onOpen={onOpen} /></td>
+                      <td className="px-4 py-3 align-middle"><Dates days={fert} onOpen={onOpen} /></td>
                     </tr>
                   );
                 })}
@@ -153,14 +216,16 @@ const toOpen = (r: Rec): OpenRecord =>
   // 噴藥紀錄有 waterLiters，施肥紀錄沒有
   "waterLiters" in r ? { kind: "spraying", record: r } : { kind: "fertilizing", record: r };
 
-function Dates({ days, tone, onOpen }: { days: Day[]; tone: "pest" | "fert"; onOpen: OnOpen }) {
+const TONE: Record<Tone, string> = {
+  pest: "bg-sky-50 text-sky-800 ring-sky-200 hover:bg-sky-100",
+  fert: "bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100",
+};
+
+/** 一格裡的日期；nav 是點開後可前後切換的範圍（預設就是這一格） */
+function Dates({ days, nav = days, onOpen, empty = "—" }: { days: Day[]; nav?: Day[]; onOpen: OnOpen; empty?: string }) {
   // 滑鼠移上去時的小視窗；用 fixed 定位，才不會被表格的捲動區塊裁掉
   const [tip, setTip] = useState<{ day: Day; left: number; top: number; above: boolean } | null>(null);
-  if (!days.length) return <span className="text-stone-300">—</span>;
-  const color =
-    tone === "pest"
-      ? "bg-sky-50 text-sky-800 ring-sky-200 hover:bg-sky-100"
-      : "bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100";
+  if (!days.length) return <span className="text-stone-300">{empty}</span>;
 
   function show(day: Day, el: HTMLElement) {
     const rect = el.getBoundingClientRect();
@@ -175,21 +240,21 @@ function Dates({ days, tone, onOpen }: { days: Day[]; tone: "pest" | "fert"; onO
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {days.map((d, i) => {
+      {days.map((d) => {
         return (
           <button
-            key={d.date}
+            key={d.tone + d.date}
             onClick={() => {
               setTip(null);
-              // 同一格的日期依序傳出去，檢視視窗才能切換上一筆／下一筆
-              onOpen(days.map((x) => toOpen(x.record!)), i);
+              // 依序傳出去，檢視視窗才能切換上一筆／下一筆
+              onOpen(nav.map((x) => toOpen(x.record!)), nav.indexOf(d));
             }}
             onMouseEnter={(e) => show(d, e.currentTarget)}
             onMouseLeave={() => setTip(null)}
             onFocus={(e) => show(d, e.currentTarget)}
             onBlur={() => setTip(null)}
-            aria-label={`${d.date}：${d.entries.map((x) => `${x.name} ${x.rate}`).join("、") || "未加入藥品"}`}
-            className={`cursor-pointer rounded-md px-2 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${color}`}
+            aria-label={`${d.date} ${d.tone === "pest" ? "噴藥" : "施肥"}：${d.entries.map((x) => `${x.name} ${x.rate}`).join("、") || "未加入藥品"}`}
+            className={`cursor-pointer rounded-md px-2 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${TONE[d.tone]}`}
           >
             {md(d.date)}
           </button>
@@ -204,7 +269,7 @@ function Dates({ days, tone, onOpen }: { days: Day[]; tone: "pest" | "fert"; onO
           }`}
         >
           <div className="mb-1.5 font-semibold text-stone-800">
-            {tip.day.date}　{tone === "pest" ? "噴藥" : "施肥"}
+            {tip.day.date}　{tip.day.tone === "pest" ? "噴藥" : "施肥"}
           </div>
           {tip.day.entries.length ? (
             <ul className="space-y-1">

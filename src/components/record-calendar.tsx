@@ -1,16 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, List } from "lucide-react";
+import { CalendarDays, CalendarRange, List } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { FertilizingRecord, SprayingRecord } from "@/lib/types";
 import { FertModal } from "./fert-modal";
 import { RecordView } from "./record-view";
-import { SprayCalendar, type OpenRecord } from "./spray-calendar";
+import { SprayCalendar, type CalendarLayout, type OpenRecord } from "./spray-calendar";
 import { SprayModal } from "./spray-modal";
 import { Select } from "./ui";
 
-export type RecordsView = "list" | "calendar";
+export type RecordsView = "list" | "calendar" | "month";
 
 /** 噴藥／施肥紀錄頁共用：年度（清單和日曆一起連動）與顯示方式 */
 export function useRecordsFilter() {
@@ -47,6 +47,7 @@ export function RecordsToolbar({
           [
             { v: "list", label: "清單", icon: List },
             { v: "calendar", label: "日曆", icon: CalendarDays },
+            { v: "month", label: "月曆", icon: CalendarRange },
           ] as const
         ).map(({ v, label, icon: Icon }) => (
           <button
@@ -66,14 +67,14 @@ export function RecordsToolbar({
 }
 
 /** 日曆：點日期先開唯讀檢視，按「修改」才進入噴藥／施肥的編輯表單 */
-export function RecordCalendar({ year }: { year: number }) {
+export function RecordCalendar({ year, layout }: { year: number; layout: CalendarLayout }) {
   const [browse, setBrowse] = useState<{ list: OpenRecord[]; index: number } | null>(null);
   const [spray, setSpray] = useState<SprayingRecord | null>(null);
   const [fert, setFert] = useState<FertilizingRecord | null>(null);
   const viewing = browse?.list[browse.index];
   return (
     <>
-      <SprayCalendar year={year} onOpen={(list, index) => setBrowse({ list, index })} />
+      <SprayCalendar year={year} layout={layout} onOpen={(list, index) => setBrowse({ list, index })} />
       {browse && viewing && (
         <RecordView
           open={viewing}

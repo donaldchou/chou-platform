@@ -7,7 +7,7 @@ import type { FertilizingRecord } from "@/lib/types";
 import { fmtDT, materialName, money, nowStr, orchardLabel, uid } from "@/lib/utils";
 import { useFertCost } from "@/components/fert-modal";
 import { useRecordActions } from "@/components/record-actions";
-import { RecordCalendar, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
+import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
 import { targetsText } from "@/components/record-parts";
 import { Button, Gallery, Modal, PageHeader, RowActions, Table, Td, Thumb } from "@/components/ui";
 
@@ -19,7 +19,9 @@ export default function FertilizingPage() {
   const open = (record: FertilizingRecord) => ({ kind: "fertilizing" as const, record });
   const filter = useRecordsFilter();
   const { year, view } = filter;
-  const list = db.fertilizing.filter(filter.inYear).sort((a, b) => b.datetime.localeCompare(a.datetime));
+  const yearList = db.fertilizing.filter(filter.inYear);
+  const list = yearList.filter(filter.matches).sort((a, b) => b.datetime.localeCompare(a.datetime));
+  const count = filter.filtering ? `符合 ${list.length} / ${yearList.length} 筆施肥紀錄` : `共 ${yearList.length} 筆施肥紀錄`;
   const mat = (id: string) => db.materials.find((m) => m.id === id);
 
   const create = (): FertilizingRecord => ({
@@ -34,35 +36,44 @@ export default function FertilizingPage() {
         desc="記錄施肥日期、肥料、每棵樹用量與費用，可產生參考卡給員工。"
         action={<Button onClick={() => edit(open(create()))}><Plus size={16} /> 新增施肥紀錄</Button>}
       />
-      <RecordsToolbar {...filter} count={`共 ${list.length} 筆施肥紀錄`} />
+      <RecordsToolbar {...filter} count={view === "list" ? count : `共 ${yearList.length} 筆施肥紀錄`} />
       {view !== "list" ? (
         <RecordCalendar year={year} layout={view} />
       ) : (
-        <Table head={["施用日期時間", "果園", "肥料", "對象", "總包數", "費用", "員工", ""]}>
-          {list.map((r) => {
-            const c = cost(r);
-            return (
-              <tr key={r.id} className="hover:bg-stone-50">
-                <Td className="whitespace-nowrap">{fmtDT(r.datetime)}</Td>
-                <Td className="font-medium">{db.orchards.find((o) => o.id === r.orchardId)?.nameZh ?? "—"}</Td>
-                <Td>{r.items.map((i) => mat(i.materialId)?.nameZh ?? "（已刪除）").join("、") || "—"}</Td>
-                <Td>{targetsText(r.targets, r.otherTarget)}</Td>
-                <Td>{c.packs} 包</Td>
-                <Td className="font-semibold">{money(c.cost)}</Td>
-                <Td>{r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}</Td>
-                <Td>
-                  <div className="flex items-center justify-end">
-                    <Button size="sm" variant="ghost" className="text-emerald-700" onClick={() => setCard(r)} title="員工參考卡">
-                      <Share2 size={14} />
-                    </Button>
-                    <RowActions confirm={false} onEdit={() => edit(open(r))} onDelete={() => remove(open(r))} />
-                  </div>
+        <>
+          <RecordFilters {...filter} />
+          <Table head={["施用日期時間", "果園", "肥料", "對象", "總包數", "費用", "員工", ""]}>
+            {list.map((r) => {
+              const c = cost(r);
+              return (
+                <tr key={r.id} className="hover:bg-stone-50">
+                  <Td className="whitespace-nowrap">{fmtDT(r.datetime)}</Td>
+                  <Td className="whitespace-nowrap font-medium">{db.orchards.find((o) => o.id === r.orchardId)?.nameZh ?? "—"}</Td>
+                  <Td>{r.items.map((i) => mat(i.materialId)?.nameZh ?? "（已刪除）").join("、") || "—"}</Td>
+                  <Td>{targetsText(r.targets, r.otherTarget)}</Td>
+                  <Td>{c.packs} 包</Td>
+                  <Td className="whitespace-nowrap font-semibold">{money(c.cost)}</Td>
+                  <Td>{r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}</Td>
+                  <Td>
+                    <div className="flex items-center justify-end">
+                      <Button size="sm" variant="ghost" className="text-emerald-700" onClick={() => setCard(r)} title="員工參考卡">
+                        <Share2 size={14} />
+                      </Button>
+                      <RowActions confirm={false} onEdit={() => edit(open(r))} onDelete={() => remove(open(r))} />
+                    </div>
+                  </Td>
+                </tr>
+              );
+            })}
+            {!list.length && (
+              <tr>
+                <Td colSpan={8} className="py-8 text-center text-stone-400">
+                  {yearList.length ? "沒有符合篩選條件的施肥紀錄" : `${year} 年尚無施肥紀錄`}
                 </Td>
               </tr>
-            );
-          })}
-          {!list.length && <tr><Td colSpan={8} className="py-8 text-center text-stone-400">{year} 年尚無施肥紀錄</Td></tr>}
-        </Table>
+            )}
+          </Table>
+        </>
       )}
       {dialogs}
       {card && <ReferenceCard record={card} onClose={() => setCard(null)} />}

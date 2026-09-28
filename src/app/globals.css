@@ -5,6 +5,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 放大整體字級（Tailwind 的尺寸都以 rem 計算，會一起等比例放大） */
+html {
+  font-size: 17px;
+}
+@media (min-width: 1024px) {
+  html {
+    font-size: 18px;
+  }
+}
+
 body {
   background: #f5f5f4;
   color: #1c1917;

@@ -14,6 +14,8 @@ type Rule = {
 /** 需要驗證碼的操作 */
 const RULES: Partial<Record<string, Rule[]>> = {
   suppliers: [{ env: "SUPPLIER_CODE", actions: ["create", "update", "delete"] }],
+  spraying: [{ env: "SPRAYING_CODE", actions: ["create", "update", "delete"] }],
+  fertilizing: [{ env: "FERTILIZING_CODE", actions: ["create", "update", "delete"] }],
   materials: [
     {
       env: "FERTILIZER_CODE",

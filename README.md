@@ -22,6 +22,8 @@ SUPPLIER_CODE=...                 # 必填，新增／編輯／刪除貨源店�
 FERTILIZER_CODE=...               # 必填，新增／編輯／刪除肥料時要輸入的驗證碼
 PESTICIDE_CODE=...                # 必填，新增／編輯／刪除農藥時要輸入的驗證碼
 PACKAGING_CODE=...                # 必填，新增／編輯／刪除包材／乾貨時要輸入的驗證碼
+SPRAYING_CODE=...                 # 必填，新增／編輯／刪除噴藥紀錄時要輸入的驗證碼
+FERTILIZING_CODE=...              # 必填，新增／編輯／刪除施肥紀錄時要輸入的驗證碼
 ```
 
 ## 程式結構
@@ -77,7 +79,7 @@ PACKAGING_CODE=...                # 必填，新增／編輯／刪除包材／�
 - **關聯檢查**：紀錄的 `orchardId`、薪水／分紅／工作的 `employeeId` 必須存在。
 - **資材價格歷史**：價格變動時，後端自動把舊價格加進 `priceHistory`，並更新「資訊異動時間」。
 - **刪除果園**：底下還有紀錄時回 409 和各類紀錄筆數；帶 `?cascade=true` 才會一併刪除。
-- **驗證碼**：新增／編輯／刪除貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）與包材／乾貨（`PACKAGING_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
+- **驗證碼**：新增／編輯／刪除貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`）、噴藥紀錄（`SPRAYING_CODE`）與施肥紀錄（`FERTILIZING_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
 - **照片**：瀏覽器先壓縮成 JPEG（最長邊 1600px），上傳到 Vercel Blob 的 `chou-platform/<folder>/`，MongoDB 只存檔案網址（base64 會被拒絕）。編輯時移除的照片、刪除資料（含果園連帶刪除的紀錄）時的照片，會自動從 Blob 刪除。
 
 ### 其他

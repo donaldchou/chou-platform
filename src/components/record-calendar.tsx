@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { CalendarDays, CalendarRange, List } from "lucide-react";
 import { useDB } from "@/lib/store";
-import type { FertilizingRecord, SprayingRecord } from "@/lib/types";
-import { FertModal } from "./fert-modal";
+import { MonthRecords } from "./month-records";
+import { useRecordActions } from "./record-actions";
 import { RecordView } from "./record-view";
-import { SprayCalendar, type CalendarLayout, type OpenRecord } from "./spray-calendar";
-import { SprayModal } from "./spray-modal";
+import { SprayCalendar, type CalendarLayout, type OnOpenMonth, type OpenRecord } from "./spray-calendar";
 import { Select } from "./ui";
 
 export type RecordsView = "list" | "calendar" | "month";
@@ -66,33 +65,47 @@ export function RecordsToolbar({
   );
 }
 
-/** 日曆：點日期先開唯讀檢視，按「修改」才進入噴藥／施肥的編輯表單 */
+/**
+ * 日曆：點日期開上次／這次／下次三筆並排；月曆：點日期開同果樹所有果園當月的紀錄。
+ * 都是唯讀，按「修改」並輸入驗證碼後才進入噴藥／施肥的編輯表單。
+ */
 export function RecordCalendar({ year, layout }: { year: number; layout: CalendarLayout }) {
   const [browse, setBrowse] = useState<{ list: OpenRecord[]; index: number } | null>(null);
-  const [spray, setSpray] = useState<SprayingRecord | null>(null);
-  const [fert, setFert] = useState<FertilizingRecord | null>(null);
+  const [monthView, setMonthView] = useState<Parameters<OnOpenMonth>[0] | null>(null);
   const viewing = browse?.list[browse.index];
+  const { edit, dialogs } = useRecordActions();
   return (
     <>
-      <SprayCalendar year={year} layout={layout} onOpen={(list, index) => setBrowse({ list, index })} />
+      <SprayCalendar
+        year={year}
+        layout={layout}
+        onOpen={(list, index) => setBrowse({ list, index })}
+        onOpenMonth={setMonthView}
+      />
+      {monthView && (
+        <MonthRecords
+          year={year}
+          {...monthView}
+          onClose={() => setMonthView(null)}
+          onEdit={(o) => {
+            edit(o);
+            setMonthView(null);
+          }}
+        />
+      )}
       {browse && viewing && (
         <RecordView
-          open={viewing}
-          nav={{
-            index: browse.index,
-            total: browse.list.length,
-            go: (index) => setBrowse({ ...browse, index }),
-          }}
+          list={browse.list}
+          index={browse.index}
+          go={(index) => setBrowse({ ...browse, index })}
           onClose={() => setBrowse(null)}
           onEdit={() => {
-            if (viewing.kind === "spraying") setSpray(viewing.record);
-            else setFert(viewing.record);
+            edit(viewing);
             setBrowse(null);
           }}
         />
       )}
-      {spray && <SprayModal record={spray} onClose={() => setSpray(null)} />}
-      {fert && <FertModal record={fert} onClose={() => setFert(null)} />}
+      {dialogs}
     </>
   );
 }

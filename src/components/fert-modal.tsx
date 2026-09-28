@@ -34,8 +34,8 @@ export function useFertCost() {
   });
 }
 
-/** 新增／編輯施肥紀錄（施肥紀錄頁與噴藥日曆共用） */
-export function FertModal({ record, onClose }: { record: FertilizingRecord; onClose: () => void }) {
+/** 新增／編輯施肥紀錄（施肥紀錄頁與日曆共用）；code 是打開前已驗證過的驗證碼，儲存時送給後端 */
+export function FertModal({ record, code, onClose }: { record: FertilizingRecord; code?: string; onClose: () => void }) {
   const db = useDB();
   const cost = useFertCost();
   const [r, setR] = useState(record);
@@ -52,7 +52,7 @@ export function FertModal({ record, onClose }: { record: FertilizingRecord; onCl
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button onClick={() => { upsert("fertilizing", r); onClose(); }}>儲存</Button>
+          <Button onClick={() => { upsert("fertilizing", r, { code }); onClose(); }}>儲存</Button>
         </>
       }
     >

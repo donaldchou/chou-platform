@@ -13,7 +13,19 @@ type Entry = { name: string; rate: string };
 type Day = { date: string; tone: Tone; entries: Entry[]; record?: Rec };
 
 /** pest＝農藥日期（藍）、fert＝肥料日期（橘） */
-type Tone = "pest" | "fert";
+export type Tone = "pest" | "fert";
+
+/**
+ * 紀錄會出現在哪一種日期：噴藥紀錄有農藥（或還沒加藥品）算農藥、有肥料（葉面肥）算肥料；施肥紀錄算肥料。
+ * 一筆噴藥紀錄可能兩種都算。
+ */
+export function tonesOf(r: Rec, category: (materialId: string) => string | undefined): Tone[] {
+  if (!("waterLiters" in r)) return ["fert"];
+  const cats = r.items.map((i) => category(i.materialId));
+  const pest = cats.includes("pesticide");
+  const fert = cats.includes("fertilizer");
+  return [...(pest || !fert ? (["pest"] as const) : []), ...(fert ? (["fert"] as const) : [])];
+}
 
 /** 日曆：果園在中間、左農藥右肥料；月曆：果園在左、1～12 月各一欄 */
 export type CalendarLayout = "calendar" | "month";
@@ -21,12 +33,12 @@ export type CalendarLayout = "calendar" | "month";
 export type OpenRecord = { kind: "spraying"; record: SprayingRecord } | { kind: "fertilizing"; record: FertilizingRecord };
 
 /** 紀錄的對象是否包含這種果樹；沒選對象的紀錄視為整個果園都有施用 */
-function coversFruit(r: Rec, fruit: string) {
+export function coversFruit(r: Rec, fruit: string) {
   if (!r.targets.length && !r.otherTarget.trim()) return true;
   return r.targets.includes(fruit) || r.otherTarget.split(/[、,，\s]+/).includes(fruit);
 }
 
-function fruitsOf(o: Orchard) {
+export function fruitsOf(o: Orchard) {
   const list: string[] = FRUITS.filter((f) => o.trees[f] > 0);
   if (o.trees.other > 0 && o.trees.otherName.trim()) list.push(o.trees.otherName.trim());
   return list;
@@ -72,7 +84,22 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
  * 噴藥、施肥日期對照表，依果樹種類分組列出果園。
  * 噴藥紀錄裡有農藥就算農藥日期、有肥料（葉面肥）就算肥料日期；施肥紀錄都算肥料日期。
  */
-export function SprayCalendar({ year, layout, onOpen }: { year: number; layout: CalendarLayout; onOpen: OnOpen }) {
+/** 月曆點日期：開啟該果樹種類、該月份所有果園的噴藥（或施肥）紀錄 */
+export type OnOpenMonth = (m: { fruit: string; month: number; tone: Tone; focusId: string }) => void;
+
+export function SprayCalendar({
+  year,
+  layout,
+  onOpen,
+  onOpenMonth,
+}: {
+  year: number;
+  layout: CalendarLayout;
+  onOpen: OnOpen;
+  onOpenMonth: OnOpenMonth;
+}) {
+  // 日曆：在同一格的日期之間前後切換
+  const openIn = (list: Day[]) => (d: Day) => onOpen(list.map((x) => toOpen(x.record!)), list.indexOf(d));
   const db = useDB();
   const mat = (id: string) => db.materials.find((m) => m.id === id);
   const inYear = (r: Rec) => r.datetime.startsWith(String(year));
@@ -161,7 +188,11 @@ export function SprayCalendar({ year, layout, onOpen }: { year: number; layout: 
                       </td>
                       {MONTHS.map((m) => (
                         <td key={m} className="border-l border-stone-100 p-1 align-top">
-                          <Dates days={row.filter((d) => Number(d.date.slice(5, 7)) === m)} nav={row} onOpen={onOpen} empty="" />
+                          <Dates
+                            days={row.filter((d) => Number(d.date.slice(5, 7)) === m)}
+                            onPick={(d) => onOpenMonth({ fruit, month: m, tone: d.tone, focusId: d.record!.id })}
+                            empty=""
+                          />
                         </td>
                       ))}
                     </tr>
@@ -197,9 +228,9 @@ export function SprayCalendar({ year, layout, onOpen }: { year: number; layout: 
                   const { pest, fert } = datesFor(o.id, fruit);
                   return (
                     <tr key={o.id} className="hover:bg-stone-50">
-                      <td className="px-4 py-3 align-middle"><Dates days={pest} onOpen={onOpen} /></td>
+                      <td className="px-4 py-3 align-middle"><Dates days={pest} onPick={openIn(pest)} /></td>
                       <td className="border-x border-stone-200 px-4 py-3 text-center font-medium text-stone-800">{o.nameZh}</td>
-                      <td className="px-4 py-3 align-middle"><Dates days={fert} onOpen={onOpen} /></td>
+                      <td className="px-4 py-3 align-middle"><Dates days={fert} onPick={openIn(fert)} /></td>
                     </tr>
                   );
                 })}
@@ -212,7 +243,7 @@ export function SprayCalendar({ year, layout, onOpen }: { year: number; layout: 
   );
 }
 
-const toOpen = (r: Rec): OpenRecord =>
+export const toOpen = (r: Rec): OpenRecord =>
   // 噴藥紀錄有 waterLiters，施肥紀錄沒有
   "waterLiters" in r ? { kind: "spraying", record: r } : { kind: "fertilizing", record: r };
 
@@ -221,8 +252,8 @@ const TONE: Record<Tone, string> = {
   fert: "bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100",
 };
 
-/** 一格裡的日期；nav 是點開後可前後切換的範圍（預設就是這一格） */
-function Dates({ days, nav = days, onOpen, empty = "—" }: { days: Day[]; nav?: Day[]; onOpen: OnOpen; empty?: string }) {
+/** 一格裡的日期，點日期時呼叫 onPick */
+function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) => void; empty?: string }) {
   // 滑鼠移上去時的小視窗；用 fixed 定位，才不會被表格的捲動區塊裁掉
   const [tip, setTip] = useState<{ day: Day; left: number; top: number; above: boolean } | null>(null);
   if (!days.length) return <span className="text-stone-300">{empty}</span>;
@@ -246,8 +277,7 @@ function Dates({ days, nav = days, onOpen, empty = "—" }: { days: Day[]; nav?:
             key={d.tone + d.date}
             onClick={() => {
               setTip(null);
-              // 依序傳出去，檢視視窗才能切換上一筆／下一筆
-              onOpen(nav.map((x) => toOpen(x.record!)), nav.indexOf(d));
+              onPick(d);
             }}
             onMouseEnter={(e) => show(d, e.currentTarget)}
             onMouseLeave={() => setTip(null)}

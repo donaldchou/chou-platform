@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Plus, Printer, Share2 } from "lucide-react";
-import { remove, useDB } from "@/lib/store";
+import { useDB } from "@/lib/store";
 import type { FertilizingRecord } from "@/lib/types";
 import { fmtDT, materialName, money, nowStr, orchardLabel, uid } from "@/lib/utils";
-import { FertModal, useFertCost } from "@/components/fert-modal";
+import { useFertCost } from "@/components/fert-modal";
+import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
 import { targetsText } from "@/components/record-parts";
 import { Button, Gallery, Modal, PageHeader, RowActions, Table, Td, Thumb } from "@/components/ui";
@@ -13,8 +14,9 @@ import { Button, Gallery, Modal, PageHeader, RowActions, Table, Td, Thumb } from
 export default function FertilizingPage() {
   const db = useDB();
   const cost = useFertCost();
-  const [editing, setEditing] = useState<FertilizingRecord | null>(null);
+  const { edit, remove, dialogs } = useRecordActions();
   const [card, setCard] = useState<FertilizingRecord | null>(null);
+  const open = (record: FertilizingRecord) => ({ kind: "fertilizing" as const, record });
   const filter = useRecordsFilter();
   const { year, view } = filter;
   const list = db.fertilizing.filter(filter.inYear).sort((a, b) => b.datetime.localeCompare(a.datetime));
@@ -30,7 +32,7 @@ export default function FertilizingPage() {
       <PageHeader
         title="施肥紀錄"
         desc="記錄施肥日期、肥料、每棵樹用量與費用，可產生參考卡給員工。"
-        action={<Button onClick={() => setEditing(create())}><Plus size={16} /> 新增施肥紀錄</Button>}
+        action={<Button onClick={() => edit(open(create()))}><Plus size={16} /> 新增施肥紀錄</Button>}
       />
       <RecordsToolbar {...filter} count={`共 ${list.length} 筆施肥紀錄`} />
       {view !== "list" ? (
@@ -53,7 +55,7 @@ export default function FertilizingPage() {
                     <Button size="sm" variant="ghost" className="text-emerald-700" onClick={() => setCard(r)} title="員工參考卡">
                       <Share2 size={14} />
                     </Button>
-                    <RowActions onEdit={() => setEditing(r)} onDelete={() => remove("fertilizing", r.id)} />
+                    <RowActions confirm={false} onEdit={() => edit(open(r))} onDelete={() => remove(open(r))} />
                   </div>
                 </Td>
               </tr>
@@ -62,7 +64,7 @@ export default function FertilizingPage() {
           {!list.length && <tr><Td colSpan={8} className="py-8 text-center text-stone-400">{year} 年尚無施肥紀錄</Td></tr>}
         </Table>
       )}
-      {editing && <FertModal record={editing} onClose={() => setEditing(null)} />}
+      {dialogs}
       {card && <ReferenceCard record={card} onClose={() => setCard(null)} />}
     </>
   );

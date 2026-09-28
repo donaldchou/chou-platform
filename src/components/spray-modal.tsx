@@ -17,8 +17,8 @@ import {
 } from "./record-parts";
 import { Button, Field, Input, Modal, NumInput, SectionTitle, Select, Textarea } from "./ui";
 
-/** 新增／編輯噴藥紀錄（噴藥紀錄頁與日曆共用） */
-export function SprayModal({ record, onClose }: { record: SprayingRecord; onClose: () => void }) {
+/** 新增／編輯噴藥紀錄（噴藥紀錄頁與日曆共用）；code 是打開前已驗證過的驗證碼，儲存時送給後端 */
+export function SprayModal({ record, code, onClose }: { record: SprayingRecord; code?: string; onClose: () => void }) {
   const db = useDB();
   const [r, setR] = useState(record);
   const [thinking, setThinking] = useState(false);
@@ -64,7 +64,7 @@ export function SprayModal({ record, onClose }: { record: SprayingRecord; onClos
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button onClick={() => { upsert("spraying", r); onClose(); }}>儲存</Button>
+          <Button onClick={() => { upsert("spraying", r, { code }); onClose(); }}>儲存</Button>
         </>
       }
     >

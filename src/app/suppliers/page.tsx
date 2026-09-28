@@ -7,7 +7,7 @@ import { removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
 import { CodeModal } from "@/components/code-modal";
 import { searchSuppliers } from "@/lib/supplier-search";
 import { SUPPLIER_CONTACTS, type MaterialCategory, type Supplier, type SupplierContact } from "@/lib/types";
-import { UNIT_SHORT, materialTargetsLabel, money, uid } from "@/lib/utils";
+import { MATERIAL_TARGETS_LABEL, UNIT_SHORT, money, uid } from "@/lib/utils";
 import {
   Button,
   Card,
@@ -552,7 +552,7 @@ function SupplierMaterialsModal({ supplier, onClose }: { supplier: Supplier; onC
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-stone-600">
                         {m.dilution && <span>稀釋 {m.dilution} 倍</span>}
-                        {m.targets && <span>{materialTargetsLabel(m.category)}：{m.targets}</span>}
+                        {m.targets && <span>{MATERIAL_TARGETS_LABEL}：{m.targets}</span>}
                         {m.usagePeriod && <span>使用時間：{m.usagePeriod}</span>}
                         {m.properties.length > 0 && <span>性質：{m.properties.join("、")}</span>}
                       </div>

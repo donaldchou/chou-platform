@@ -33,7 +33,7 @@ const MaterialSchema = new Schema({
   price: money,
   priceHistory: { type: [new Schema({ date: ymd, price: money }, sub)], default: [] }, // 保留之前的價格
   dilution: str, // 使用比例（倍數）
-  targets: str, // 農藥：防治對象；肥料：成分說明
+  targets: str, // 成分說明
   properties: { type: [String], default: [] }, // 性質
   usagePeriod: str, // 使用時間
   bannedPeriod: str, // 禁用時間（紅字提醒）

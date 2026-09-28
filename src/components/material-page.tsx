@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, History, Plus, Search } from "lucide-react";
 import { remove, removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
 import type { Material, MaterialCategory, MaterialUnit } from "@/lib/types";
-import { UNIT_LABELS, UNIT_SHORT, materialTargetsLabel, money, todayStr, uid } from "@/lib/utils";
+import { MATERIAL_TARGETS_LABEL, UNIT_LABELS, UNIT_SHORT, money, todayStr, uid } from "@/lib/utils";
 import { CodeModal } from "./code-modal";
 import {
   Badge,
@@ -39,23 +39,23 @@ type Meta = {
 const META: Record<MaterialCategory, Meta> = {
   pesticide: {
     title: "農藥", units: ["ml", "g", "kg"], props: ["殺細菌", "病毒", "殺蟲", "營養補充"],
-    targetsPlaceholder: "例：炭疽病、薊馬", createdLabel: "登入時間", maxPhotos: 1, needsCode: false,
+    targetsPlaceholder: "例：亞托敏 23% 水懸劑", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
   },
   fertilizer: {
     title: "肥料", units: ["ml", "g", "kg"],
-    props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥", "高氮肥", "平均肥", "高鉀肥"],
+    props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥", "高氮肥", "平均肥", "高鉀肥", "高磷鉀肥"],
     targetsPlaceholder: "例：氮 15%、磷 15%、鉀 15%", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
   },
   packaging: {
     title: "包材／乾貨", units: ["g", "kg", "片"], props: ["套袋", "包裝", "防潮", "資材"],
-    targetsPlaceholder: "", createdLabel: "登入時間", maxPhotos: 1, needsCode: false,
+    targetsPlaceholder: "例：PE 材質、25×30 cm", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
   },
 };
 
 export function MaterialPage({ category }: { category: MaterialCategory }) {
   const db = useDB();
   const meta = META[category];
-  const targetsLabel = materialTargetsLabel(category);
+  const targetsLabel = MATERIAL_TARGETS_LABEL;
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Material | null>(null);
   // 需要驗證碼的類別：先驗證再打開表單，驗證碼留著儲存時送給後端
@@ -335,7 +335,7 @@ function MaterialModal({
 
       <SectionTitle>使用方式</SectionTitle>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={materialTargetsLabel(m.category)}>
+        <Field label={MATERIAL_TARGETS_LABEL}>
           <Input value={m.targets} onChange={(e) => set("targets", e.target.value)} placeholder={meta.targetsPlaceholder} />
         </Field>
         <Field label="使用時間">

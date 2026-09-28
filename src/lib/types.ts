@@ -109,7 +109,7 @@ export interface Material {
   price: number;
   priceHistory: { date: string; price: number }[];
   dilution: string;
-  targets: string; // 農藥：防治對象；肥料：成分說明
+  targets: string; // 成分說明
   properties: string[];
   usagePeriod: string;
   bannedPeriod: string;

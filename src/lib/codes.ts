@@ -20,6 +20,16 @@ const RULES: Partial<Record<string, Rule[]>> = {
       actions: ["create", "update", "delete"],
       applies: (doc) => doc.category === "fertilizer",
     },
+    {
+      env: "PESTICIDE_CODE",
+      actions: ["create", "update", "delete"],
+      applies: (doc) => doc.category === "pesticide",
+    },
+    {
+      env: "PACKAGING_CODE",
+      actions: ["create", "update", "delete"],
+      applies: (doc) => doc.category === "packaging",
+    },
   ],
 };
 

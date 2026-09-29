@@ -34,16 +34,19 @@ type Meta = {
   maxPhotos: number;
   /** 新增／修改／刪除要輸入驗證碼（後端也會檢查） */
   needsCode: boolean;
+  /** 顯示「製造廠商」欄位 */
+  manufacturer?: boolean;
 };
 
 const META: Record<MaterialCategory, Meta> = {
   pesticide: {
-    title: "農藥", units: ["ml", "g", "kg"], props: ["殺細菌", "病毒", "殺蟲", "營養補充"],
+    title: "農藥", units: ["ml", "g", "kg"], props: ["殺細菌", "殺真菌", "病毒", "殺蟲", "除草", "營養補充"],
     targetsPlaceholder: "例：亞托敏 23% 水懸劑", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
+    manufacturer: true,
   },
   fertilizer: {
     title: "肥料", units: ["ml", "g", "kg"],
-    props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥", "高氮肥", "平均肥", "高鉀肥", "高磷鉀肥"],
+    props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥", "高氮肥", "平均肥", "高鉀肥", "高磷鉀肥", "鈣肥", "硼肥", "微量元素肥"],
     targetsPlaceholder: "例：氮 15%、磷 15%、鉀 15%", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
   },
   packaging: {
@@ -69,7 +72,7 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
   // 選項：預設選項，加上資料裡實際出現過的其他性質
   const propOptions = [...new Set([...meta.props, ...inCategory.flatMap((m) => m.properties)])];
   const list = inCategory
-    .filter((m) => !q || `${m.nameZh}${m.nameEn}${m.targets}`.toLowerCase().includes(q.toLowerCase()))
+    .filter((m) => !q || `${m.nameZh}${m.nameEn}${m.manufacturer ?? ""}${m.targets}`.toLowerCase().includes(q.toLowerCase()))
     .filter((m) => {
       if (!props.length) return true;
       return mode === "all" ? props.every((p) => m.properties.includes(p)) : props.some((p) => m.properties.includes(p));
@@ -78,7 +81,7 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
   const supplier = (id: string) => db.suppliers.find((s) => s.id === id);
 
   const create = (): Material => ({
-    id: uid(), category, nameZh: "", nameEn: "", createdAt: todayStr(), updatedAt: todayStr(),
+    id: uid(), category, nameZh: "", nameEn: "", manufacturer: "", createdAt: todayStr(), updatedAt: todayStr(),
     unit: meta.units[0], size: 0, price: 0, priceHistory: [], dilution: "", targets: "", properties: [],
     usagePeriod: "", bannedPeriod: "", photos: [], supplierId: db.suppliers[0]?.id ?? "",
   });
@@ -95,7 +98,7 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
       <div className="mb-4 space-y-3">
         <div className="relative max-w-sm">
           <Search size={16} className="absolute left-3 top-2.5 text-stone-400" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`搜尋名稱或${targetsLabel}`} className="pl-9" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={meta.manufacturer ? `搜尋名稱、廠商或${targetsLabel}` : `搜尋名稱或${targetsLabel}`} className="pl-9" />
         </div>
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="篩選性質">
           <span className="text-sm font-medium text-stone-600">性質：</span>
@@ -171,6 +174,7 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
               <Td>
                 <div className="font-medium">{m.nameZh}</div>
                 <div className="text-xs text-stone-500">{m.nameEn}</div>
+                {meta.manufacturer && m.manufacturer && <div className="text-xs text-stone-500">廠商：{m.manufacturer}</div>}
               </Td>
               <Td className="whitespace-nowrap">
                 {m.size}{UNIT_SHORT[m.unit]}
@@ -296,6 +300,15 @@ function MaterialModal({
         <Field label="名稱（英文）">
           <Input value={m.nameEn} onChange={(e) => set("nameEn", e.target.value)} />
         </Field>
+        {meta.manufacturer && (
+          <Field label="製造廠商" className="sm:col-span-2">
+            <Input
+              value={m.manufacturer ?? ""}
+              onChange={(e) => set("manufacturer", e.target.value)}
+              placeholder="例：台灣拜耳股份有限公司"
+            />
+          </Field>
+        )}
         <div className="flex gap-6 text-sm text-stone-500 sm:col-span-2">
           <span>{meta.createdLabel}：{m.createdAt}</span>
           <span>資訊異動時間：{m.updatedAt}</span>

@@ -102,6 +102,8 @@ export interface Material {
   category: MaterialCategory;
   nameZh: string;
   nameEn: string;
+  /** 製造廠商（目前只有農藥頁面使用；舊資料可能沒有這個欄位） */
+  manufacturer?: string;
   createdAt: string;
   updatedAt: string;
   unit: MaterialUnit;

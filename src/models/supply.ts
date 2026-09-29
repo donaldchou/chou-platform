@@ -26,6 +26,7 @@ const MaterialSchema = new Schema({
   category: { type: String, enum: ["pesticide", "fertilizer", "packaging"], required: true, index: true },
   nameZh: { type: String, required: [true, "請填寫中文名稱"], trim: true },
   nameEn: str,
+  manufacturer: str, // 製造廠商（目前只有農藥頁面使用）
   createdAt: ymd, // 登錄時間
   updatedAt: ymd, // 資訊異動時間
   unit: { type: String, enum: ["ml", "g", "kg", "片"], required: true },

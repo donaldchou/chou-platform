@@ -40,7 +40,7 @@ type Meta = {
 
 const META: Record<MaterialCategory, Meta> = {
   pesticide: {
-    title: "農藥", units: ["ml", "g", "kg"], props: ["殺細菌", "殺真菌", "病毒", "殺蟲", "除草", "營養補充"],
+    title: "農藥", units: ["ml", "g", "kg"], props: ["殺細菌", "殺真菌", "病毒", "殺蟲", "除草", "營養補充", "輔助劑"],
     targetsPlaceholder: "例：亞托敏 23% 水懸劑", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
     manufacturer: true,
   },

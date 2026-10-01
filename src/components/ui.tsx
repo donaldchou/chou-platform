@@ -3,12 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Pencil, Trash2, X } from "lucide-react";
 import { Lightbox } from "./lightbox";
+import { useCanEdit } from "@/lib/store";
 import { photoSrc, uploadPhoto } from "@/lib/utils";
 
 export { Lightbox };
 
 export const inputCls =
   "w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 disabled:bg-stone-100";
+
+/** 只有管理者看得到的內容（新增、修改、刪除按鈕） */
+export function EditOnly({ children }: { children: React.ReactNode }) {
+  return useCanEdit() ? children : null;
+}
 
 export function PageHeader({
   title,
@@ -17,15 +23,17 @@ export function PageHeader({
 }: {
   title: string;
   desc?: string;
+  /** 新增、編輯等按鈕，只有管理者看得到 */
   action?: React.ReactNode;
 }) {
+  const canEdit = useCanEdit();
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 className="text-2xl font-bold text-stone-900">{title}</h1>
         {desc && <p className="mt-1 text-sm text-stone-500">{desc}</p>}
       </div>
-      {action && <div className="flex flex-wrap gap-2">{action}</div>}
+      {action && canEdit && <div className="flex flex-wrap gap-2">{action}</div>}
     </div>
   );
 }
@@ -466,6 +474,8 @@ export function RowActions({
   /** false：不跳出瀏覽器確認框（由 onDelete 自己處理，例如驗證碼對話框） */
   confirm?: boolean;
 }) {
+  // 一般使用者只能看
+  if (!useCanEdit()) return null;
   return (
     <div className="flex justify-end">
       <Button size="sm" variant="ghost" onClick={onEdit} title="編輯">

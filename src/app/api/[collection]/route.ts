@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { HttpError, handleError, readJson } from "@/lib/api";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import { assertCode, codeFromHeaders } from "@/lib/codes";
 import { isCollection } from "@/lib/collections";
 import { createDoc, listDocs } from "@/lib/repo";
@@ -13,6 +14,7 @@ async function collectionOf(ctx: RouteContext<"/api/[collection]">) {
 /** GET /api/<collection>?欄位=值&from=&to= 取得列表 */
 export async function GET(req: NextRequest, ctx: RouteContext<"/api/[collection]">) {
   try {
+    await requireUser();
     const name = await collectionOf(ctx);
     return NextResponse.json(await listDocs(name, req.nextUrl.searchParams));
   } catch (err) {
@@ -23,6 +25,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/[collection]
 /** POST /api/<collection> 新增一筆 */
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/[collection]">) {
   try {
+    await requireAdmin();
     const name = await collectionOf(ctx);
     const body = await readJson(req);
     assertCode(name, "create", codeFromHeaders(req.headers), [body]);

@@ -9,6 +9,7 @@ import {
   BarChart,
   Button,
   Card,
+  EditOnly,
   Field,
   Input,
   Modal,
@@ -155,17 +156,19 @@ export function BillsPage({ kind }: { kind: BillKind }) {
             <Td>{b.photos[0] ? <Thumb src={b.photos[0]} photos={b.photos} showCount /> : <span className="text-stone-400">—</span>}</Td>
             <Td className="text-stone-500">{b.note}</Td>
             <Td className="whitespace-nowrap text-right">
-              <Button size="sm" variant="ghost" onClick={() => setEditing(b)}>
-                <Pencil size={14} />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-red-600"
-                onClick={() => confirmDelete() && remove("bills", b.id)}
-              >
-                <Trash2 size={14} />
-              </Button>
+              <EditOnly>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(b)}>
+                  <Pencil size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-600"
+                  onClick={() => confirmDelete() && remove("bills", b.id)}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </EditOnly>
             </Td>
           </tr>
         ))}

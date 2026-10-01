@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { HttpError, handleError } from "@/lib/api";
+import { requireAdmin } from "@/lib/auth";
 import { uploadImage } from "@/lib/blob";
 
 // Vercel 伺服器上傳的 body 上限約 4.5MB；前端會先壓縮成 JPEG（約 100–300KB）
@@ -12,6 +13,7 @@ const MAX_BYTES = 4 * 1024 * 1024;
  */
 export async function POST(req: Request) {
   try {
+    await requireAdmin();
     const form = await req.formData().catch(() => {
       throw new HttpError(400, "請用 multipart/form-data 上傳");
     });

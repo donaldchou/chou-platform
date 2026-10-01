@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { HttpError, handleError, readJson } from "@/lib/api";
+import { requireAdmin } from "@/lib/auth";
 import { assertCode, needsCode, type CodeAction } from "@/lib/codes";
 
 /**
@@ -9,6 +10,7 @@ import { assertCode, needsCode, type CodeAction } from "@/lib/codes";
  */
 export async function POST(req: Request) {
   try {
+    await requireAdmin(); // 一般使用者不能修改，也就不用試驗證碼
     const body = await readJson(req);
     const collection = String(body.collection ?? "");
     const action = body.action as CodeAction;

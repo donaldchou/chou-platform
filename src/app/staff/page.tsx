@@ -9,6 +9,7 @@ import {
   Badge,
   Button,
   Card,
+  EditOnly,
   Field,
   Gallery,
   Input,
@@ -105,16 +106,18 @@ function TasksTab() {
             </button>
           ))}
         </div>
-        <Button
-          onClick={() =>
-            setEditing({
-              id: uid(), employeeId: db.employees[0]?.id ?? "", orchardId: db.orchards[0]?.id ?? "", category: "噴藥",
-              title: "", dueDate: todayStr(), status: "待處理", report: "", reportedAt: "",
-            })
-          }
-        >
-          <Plus size={16} /> 指派工作
-        </Button>
+        <EditOnly>
+          <Button
+            onClick={() =>
+              setEditing({
+                id: uid(), employeeId: db.employees[0]?.id ?? "", orchardId: db.orchards[0]?.id ?? "", category: "噴藥",
+                title: "", dueDate: todayStr(), status: "待處理", report: "", reportedAt: "",
+              })
+            }
+          >
+            <Plus size={16} /> 指派工作
+          </Button>
+        </EditOnly>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {list.map((t) => (
@@ -139,13 +142,15 @@ function TasksTab() {
               <div className="mt-3 text-sm text-stone-400">尚未回報</div>
             )}
             {t.status !== "已完成" && (
-              <div className="mt-3 flex gap-2">
-                {TASK_STATUSES.filter((s) => s !== t.status).map((s) => (
-                  <Button key={s} size="sm" variant="secondary" onClick={() => upsert("tasks", { ...t, status: s })}>
-                    標記為{s}
-                  </Button>
-                ))}
-              </div>
+              <EditOnly>
+                <div className="mt-3 flex gap-2">
+                  {TASK_STATUSES.filter((s) => s !== t.status).map((s) => (
+                    <Button key={s} size="sm" variant="secondary" onClick={() => upsert("tasks", { ...t, status: s })}>
+                      標記為{s}
+                    </Button>
+                  ))}
+                </div>
+              </EditOnly>
             )}
           </Card>
         ))}
@@ -212,15 +217,17 @@ function SalaryTab() {
         <StatCard label={`${month} 薪資合計`} value={money(monthTotal)} />
         <StatCard label={`${year} 年薪資累計`} value={money(yearTotal)} />
       </div>
-      <div className="mb-3 flex justify-end">
-        <Button
-          onClick={() =>
-            setEditing({ id: uid(), employeeId: db.employees[0]?.id ?? "", month: thisMonth(), amount: 0, photos: [], note: "" })
-          }
-        >
-          <Plus size={16} /> 新增薪資
-        </Button>
-      </div>
+      <EditOnly>
+        <div className="mb-3 flex justify-end">
+          <Button
+            onClick={() =>
+              setEditing({ id: uid(), employeeId: db.employees[0]?.id ?? "", month: thisMonth(), amount: 0, photos: [], note: "" })
+            }
+          >
+            <Plus size={16} /> 新增薪資
+          </Button>
+        </div>
+      </EditOnly>
       <Table head={["月份", "員工", "金額", "薪資單照片", "備註", ""]}>
         {list.map((s) => (
           <tr key={s.id} className="hover:bg-stone-50">
@@ -279,11 +286,13 @@ function BonusTab() {
           <StatCard key={e.id} label={`${e.name} 累計分紅`} value={money(total)} />
         ))}
       </div>
-      <div className="mb-3 flex justify-end">
-        <Button onClick={() => setEditing({ id: uid(), employeeId: db.employees[0]?.id ?? "", date: todayStr(), amount: 0, note: "" })}>
-          <Plus size={16} /> 新增分紅
-        </Button>
-      </div>
+      <EditOnly>
+        <div className="mb-3 flex justify-end">
+          <Button onClick={() => setEditing({ id: uid(), employeeId: db.employees[0]?.id ?? "", date: todayStr(), amount: 0, note: "" })}>
+            <Plus size={16} /> 新增分紅
+          </Button>
+        </div>
+      </EditOnly>
       <Table head={["日期", "員工", "金額（NTD）", "說明", ""]}>
         {list.map((b) => (
           <tr key={b.id} className="hover:bg-stone-50">
@@ -328,11 +337,13 @@ function EmployeesTab() {
   const [editing, setEditing] = useState<Employee | null>(null);
   return (
     <>
-      <div className="mb-3 flex justify-end">
-        <Button onClick={() => setEditing({ id: uid(), name: "", phone: "", title: "正職員工" })}>
-          <Plus size={16} /> 新增員工
-        </Button>
-      </div>
+      <EditOnly>
+        <div className="mb-3 flex justify-end">
+          <Button onClick={() => setEditing({ id: uid(), name: "", phone: "", title: "正職員工" })}>
+            <Plus size={16} /> 新增員工
+          </Button>
+        </div>
+      </EditOnly>
       <Table head={["姓名", "電話", "職稱", "待辦工作", ""]}>
         {db.employees.map((e) => (
           <tr key={e.id} className="hover:bg-stone-50">

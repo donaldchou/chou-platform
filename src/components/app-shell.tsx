@@ -14,9 +14,11 @@ import {
   FlaskConical,
   LayoutDashboard,
   Leaf,
+  LogOut,
   Menu,
   Package,
   Scissors,
+  ShieldCheck,
   ShoppingBasket,
   SprayCan,
   Sprout,
@@ -27,7 +29,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { reload, useDBStatus } from "@/lib/store";
+import { logout, reload, useDBStatus, useMe } from "@/lib/store";
 
 const NAV = [
   {
@@ -65,6 +67,12 @@ const NAV = [
     ],
   },
 ];
+
+/** 只有管理者看得到的選單 */
+const ADMIN_NAV = { group: "系統", items: [{ href: "/admin", label: "後台管理", icon: ShieldCheck }] };
+
+/** 不套用側邊選單的頁面 */
+const BARE_PAGES = ["/login"];
 
 /* ---------------- 側邊選單收合狀態，記在這台電腦的瀏覽器 ---------------- */
 const COLLAPSE_KEY = "chou-sidebar-collapsed";
@@ -104,9 +112,17 @@ function useCollapsed(): [boolean, (v: boolean) => void] {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  if (BARE_PAGES.includes(pathname)) return <>{children}</>;
+  return <Shell pathname={pathname}>{children}</Shell>;
+}
+
+function Shell({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   // 只有桌機的浮動選單會收合；手機仍用抽屜
   const [collapsed, setCollapsed] = useCollapsed();
+  const me = useMe();
+  const groups = me?.role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
+  const roleLabel = me ? (me.role === "admin" ? "管理者" : "一般使用者（唯讀）") : "";
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
@@ -128,7 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className={`flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-4 ${mini ? "px-2" : "px-3"}`}
         style={{ scrollbarWidth: "thin", scrollbarColor: "#047857 transparent" }}
       >
-        {NAV.map((g) => (
+        {groups.map((g) => (
           <div key={g.group}>
             {mini ? (
               <div className="mx-2 mb-2 border-t border-emerald-800" />
@@ -153,10 +169,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         ))}
       </div>
-      <div className="border-t border-emerald-800 p-3">
-        <div className={`flex items-center gap-2 text-base text-emerald-100 ${mini ? "justify-center" : "px-2"}`} title={mini ? "農場管理者" : undefined}>
-          <UserRound size={18} className="shrink-0" /> {!mini && "農場管理者"}
+      <div className="space-y-1 border-t border-emerald-800 p-3">
+        <div
+          className={`flex items-center gap-2 text-base text-emerald-100 ${mini ? "justify-center" : "px-2"}`}
+          title={me ? `${me.email}（${roleLabel}）` : undefined}
+        >
+          <UserRound size={18} className="shrink-0" />
+          {!mini && (
+            <div className="min-w-0">
+              <div className="truncate">{me?.name || me?.email || "…"}</div>
+              <div className="text-sm text-emerald-300/80">{roleLabel}</div>
+            </div>
+          )}
         </div>
+        <button
+          onClick={() => void logout()}
+          title={mini ? "登出" : undefined}
+          aria-label="登出"
+          className={`flex w-full cursor-pointer items-center gap-3 rounded-lg py-2 text-base text-emerald-50/85 hover:bg-emerald-800/70 ${
+            mini ? "justify-center px-0" : "px-3"
+          }`}
+        >
+          <LogOut size={18} className="shrink-0" /> {!mini && "登出"}
+        </button>
       </div>
     </nav>
   );

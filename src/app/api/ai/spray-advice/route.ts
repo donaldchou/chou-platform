@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleError, readJson } from "@/lib/api";
+import { requireAdmin } from "@/lib/auth";
 import { connectDB } from "@/lib/mongodb";
 import { advicePrompt, fallbackAdvice } from "@/lib/spray-advice";
 import type { Material } from "@/lib/types";
@@ -44,6 +45,7 @@ async function askGemini(prompt: string, apiKey: string) {
  */
 export async function POST(req: Request) {
   try {
+    await requireAdmin(); // 只在編輯噴藥紀錄時使用，也避免一般使用者消耗 AI 額度
     const body = await readJson(req);
     const stage = String(body.stage ?? "");
     const targets = String(body.targets ?? "—");

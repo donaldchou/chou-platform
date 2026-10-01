@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
-import { connectDB } from "@/lib/mongodb";
+import { requireUser } from "@/lib/auth";
 import { daysUntil, todayStr } from "@/lib/utils";
 import type { Material, Orchard, Task } from "@/lib/types";
 import { OrchardModel } from "@/models/orchard";
@@ -14,7 +14,7 @@ import { MaterialModel } from "@/models/supply";
  */
 export async function GET(req: Request) {
   try {
-    await connectDB();
+    await requireUser();
     const days = Number(new URL(req.url).searchParams.get("days") ?? 90);
     const today = todayStr();
     const limit = new Date(today);

@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { handleError } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
-import { loadAll } from "@/lib/repo";
 
-/** GET /api/db 一次取得所有資料，前端啟動時使用 */
+/** GET /api/auth/me 目前登入的使用者（沒登入回 401） */
 export async function GET() {
   try {
-    await requireUser();
-    return NextResponse.json(await loadAll());
+    return NextResponse.json(await requireUser());
   } catch (err) {
     return handleError(err);
   }

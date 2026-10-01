@@ -24,7 +24,24 @@ PESTICIDE_CODE=...                # 必填，新增／編輯／刪除農藥時�
 PACKAGING_CODE=...                # 必填，新增／編輯／刪除包材／乾貨時要輸入的驗證碼
 SPRAYING_CODE=...                 # 必填，新增／編輯／刪除噴藥紀錄時要輸入的驗證碼
 FERTILIZING_CODE=...              # 必填，新增／編輯／刪除施肥紀錄時要輸入的驗證碼
+JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少 32 個字元的亂碼）
 ```
+
+## 登入與權限
+
+整個網站都要登入（`src/proxy.ts`），沒有註冊頁。
+
+- **身分**（`users.role`）：`admin` 管理者可以新增／修改／刪除資料並進入 `/admin` 後台；`user` 一般使用者只能檢視。
+- **第一個管理者**用一次性腳本建立（密碼用環境變數傳，不留在指令歷史；已有帳號時不會覆寫，加 `--reset` 才重設密碼）：
+
+  ```powershell
+  $env:ADMIN_PASSWORD = "密碼"; node scripts/create-admin.mjs you@example.com; Remove-Item Env:ADMIN_PASSWORD
+  ```
+
+- 其他帳號由管理者在後台「使用者管理」建立，也可以改身分、停用、重設密碼、刪除（不能對自己降級、停用或刪除）。
+- 密碼用 bcrypt 雜湊存在 `users` 集合；登入後 JWT（HS256，7 天）放在 HttpOnly cookie `chou_session`。
+- proxy 只驗證 JWT 簽章；API 會再用 `requireUser()`／`requireAdmin()`（`src/lib/auth.ts`）回資料庫確認，所以停用帳號或改身分會立即生效。
+- 同一個 email 連續輸錯 5 次密碼會暫停 15 分鐘。
 
 ## 程式結構
 
@@ -95,7 +112,18 @@ FERTILIZING_CODE=...              # 必填，新增／編輯／刪除施肥紀�
 | GET | `/api/stats/bills?kind=water&year=2026&orchardId=o1` | 水電費每月、歷年、各果園統計 |
 | POST | `/api/ai/spray-advice` | 噴藥 AI 建議，body：`{ stage, targets, waterLiters, materialIds }` |
 
+所有 API 都要登入（未登入回 401）；新增／修改／刪除、上傳、驗證碼檢查、AI 建議只有管理者能用（一般使用者回 403）。
+
+### 登入與後台
+
+| 方法 | 路徑 | 說明 |
+|---|---|---|
+| POST | `/api/auth/login` | body：`{ email, password }`，成功時設定登入 cookie |
+| POST | `/api/auth/logout` | 清掉登入 cookie |
+| GET | `/api/auth/me` | 目前登入的使用者 |
+| GET／POST | `/api/admin/users` | 管理者：使用者列表／新增（`{ email, password, name?, role? }`） |
+| PATCH／DELETE | `/api/admin/users/<id>` | 管理者：修改（`{ name?, role?, active?, password? }`）／刪除 |
+
 ## 尚未實作
 
-- 登入與權限：目前任何能連到網站的人都能讀寫資料
 - 上傳照片後按「取消」不儲存，已上傳的照片會留在 Blob 中（未被任何資料使用）

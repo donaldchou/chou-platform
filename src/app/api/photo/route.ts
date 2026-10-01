@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { HttpError, handleError } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 import { readImage } from "@/lib/blob";
 
 /**
@@ -8,6 +9,7 @@ import { readImage } from "@/lib/blob";
  */
 export async function GET(req: NextRequest) {
   try {
+    await requireUser();
     const url = req.nextUrl.searchParams.get("url");
     if (!url) throw new HttpError(400, "缺少 url");
     const { stream, blob } = await readImage(url);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
-import { useDB } from "@/lib/store";
+import { useCanEdit, useDB } from "@/lib/store";
 import { fmtDT } from "@/lib/utils";
 import { RecordCard } from "./record-view";
 import { coversFruit, fruitsOf, toOpen, tonesOf, type OpenRecord, type Tone } from "./spray-calendar";
@@ -34,6 +34,7 @@ export function MonthRecords({
   onEdit: (o: OpenRecord) => void;
 }) {
   const db = useDB();
+  const canEdit = useCanEdit();
   const [month, setMonth] = useState(startMonth);
 
   useEffect(() => {
@@ -113,9 +114,11 @@ export function MonthRecords({
                             {o.kind === "spraying" ? "噴藥" : "施肥"}
                           </span>
                           <span className="text-sm font-semibold tabular-nums text-stone-800">{fmtDT(o.record.datetime)}</span>
-                          <Button size="sm" variant="ghost" className="ml-auto text-emerald-700" onClick={() => onEdit(o)}>
-                            <Pencil size={14} /> 修改
-                          </Button>
+                          {canEdit && (
+                            <Button size="sm" variant="ghost" className="ml-auto text-emerald-700" onClick={() => onEdit(o)}>
+                              <Pencil size={14} /> 修改
+                            </Button>
+                          )}
                         </div>
                         <RecordCard open={o} showKind={false} />
                       </article>

@@ -22,6 +22,14 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
   if (res.status === 204) return undefined as T;
+  // 登入過期：回登入頁，登入後再回到這一頁
+  if (res.status === 401 && typeof window !== "undefined" && location.pathname !== "/login") {
+    // 帳號被停用時 JWT 可能還有效，先清掉 cookie，否則登入頁會被 proxy 導回首頁、無限循環
+    await fetch("/api/auth/logout", { method: "POST" });
+    // 故意整頁重新載入，清掉記憶體裡的資料
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error ?? `HTTP ${res.status}`), { status: res.status, data });
   return data as T;
@@ -67,8 +75,57 @@ function replaceItem<K extends Coll>(db: DB, key: K, item: Item<K>): DB {
 const codeHeader = (code?: string): Record<string, string> =>
   code === undefined ? {} : { "x-verify-code": encodeURIComponent(code) };
 
+/* ---------------- 目前登入的使用者 ---------------- */
+export type Me = { id: string; email: string; name: string; role: "admin" | "user" };
+let me: Me | null = null;
+let meLoading = false;
+const meListeners = new Set<() => void>();
+
+async function loadMe() {
+  meLoading = true;
+  try {
+    me = await api<Me>("/api/auth/me");
+  } catch {
+    me = null;
+  }
+  meListeners.forEach((l) => l());
+}
+
+/** 目前登入的使用者；還沒載入完是 null */
+export function useMe(): Me | null {
+  return useSyncExternalStore(
+    (l) => {
+      meListeners.add(l);
+      if (!meLoading) void loadMe();
+      return () => meListeners.delete(l);
+    },
+    () => me,
+    () => null,
+  );
+}
+
+/** 只有管理者可以新增、修改、刪除；一般使用者只能看 */
+export const useCanEdit = () => useMe()?.role === "admin";
+
+export async function logout() {
+  await fetch("/api/auth/logout", { method: "POST" });
+  // 故意整頁重新載入，清掉記憶體裡的資料和登入身分
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.href = "/login";
+}
+
+/** 一般使用者按到修改功能時擋下來（後端也會擋，這裡只是不讓畫面先變再變回去） */
+const READ_ONLY = "一般使用者只能檢視資料，不能新增、修改或刪除。";
+
+function readOnlyBlocked() {
+  if (me?.role === "admin") return false;
+  alert(READ_ONLY);
+  return true;
+}
+
 /** 新增或更新一筆資料，回傳是否成功。需要驗證碼的操作（例如貨源店家）要帶 code。 */
 export async function upsert<K extends Coll>(key: K, item: Item<K>, opts: { code?: string } = {}): Promise<boolean> {
+  if (readOnlyBlocked()) return false;
   const prev = state;
   setLocal(replaceItem(state, key, item));
   try {
@@ -89,6 +146,7 @@ export async function upsert<K extends Coll>(key: K, item: Item<K>, opts: { code
 
 /** 刪除一筆資料。果園底下還有紀錄時，會再詢問是否一併刪除。 */
 export async function remove<K extends Coll>(key: K, id: string): Promise<boolean> {
+  if (readOnlyBlocked()) return false;
   const prev = state;
   setLocal({ ...state, [key]: (state[key] as Item<K>[]).filter((x) => x.id !== id) });
   const url = `/api/${key}/${encodeURIComponent(id)}`;
@@ -127,6 +185,7 @@ export async function removeWithCode<K extends Coll>(
   id: string,
   code: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (me?.role !== "admin") return { ok: false, error: READ_ONLY };
   try {
     await api(`/api/${key}/${encodeURIComponent(id)}`, {
       method: "DELETE",
@@ -146,6 +205,7 @@ export async function verifyCode(
   code: string,
   category?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (me?.role !== "admin") return { ok: false, error: READ_ONLY };
   try {
     await api("/api/verify-code", { method: "POST", body: JSON.stringify({ collection, action, code, category }) });
     return { ok: true };

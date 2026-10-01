@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
-import { useDB } from "@/lib/store";
+import { useCanEdit, useDB } from "@/lib/store";
 import { fmtDT, materialCost, materialName, money } from "@/lib/utils";
 import { useFertCost } from "./fert-modal";
 import { targetsText } from "./record-parts";
@@ -39,6 +39,7 @@ export function RecordView({
   }, [index, total, go]);
 
   const db = useDB();
+  const canEdit = useCanEdit();
   const current = list[index];
   const orchard = db.orchards.find((o) => o.id === current.record.orchardId)?.nameZh;
   const slots = [
@@ -69,7 +70,7 @@ export function RecordView({
             </div>
           )}
           <Button variant="secondary" onClick={onClose}>關閉</Button>
-          <Button onClick={onEdit}><Pencil size={15} /> 修改這次</Button>
+          {canEdit && <Button onClick={onEdit}><Pencil size={15} /> 修改這次</Button>}
         </>
       }
     >

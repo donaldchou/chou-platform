@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Pencil, Trash2 } from "lucide-react";
-import { remove, useDB, useDBStatus } from "@/lib/store";
+import { useState } from "react";
+import { removeWithCode, useDB, useDBStatus } from "@/lib/store";
+import { CodeModal } from "@/components/code-modal";
 import { FRUITS } from "@/lib/types";
 import {
   Badge,
@@ -13,7 +15,6 @@ import {
   PageHeader,
   Gallery,
   StatCard,
-  confirmDelete,
 } from "@/components/ui";
 import { contractStatus, money, orchardArea, orchardTrees, todayStr } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ export default function OrchardDetail() {
   const router = useRouter();
   const db = useDB();
   const { ready } = useDBStatus();
+  const [deleting, setDeleting] = useState(false);
   const o = db.orchards.find((x) => x.id === id);
 
   if (!ready) return null;
@@ -72,26 +74,41 @@ export default function OrchardDetail() {
                 <Pencil size={16} /> 編輯
               </Button>
             </Link>
-            <Button
-              variant="secondary"
-              className="text-red-600"
-              onClick={async () => {
-                if (confirmDelete(`「${o.nameZh}」`) && (await remove("orchards", o.id))) {
-                  router.push("/orchards");
-                }
-              }}
-            >
+            <Button variant="secondary" className="text-red-600" onClick={() => setDeleting(true)}>
               <Trash2 size={16} /> 刪除
             </Button>
           </>
         }
       />
 
+      {deleting && (
+        <CodeModal
+          title="刪除果園"
+          confirmLabel="確認刪除"
+          danger
+          onClose={() => setDeleting(false)}
+          onSubmit={async (code) => {
+            const res = await removeWithCode("orchards", o.id, code);
+            if (res.ok) router.push("/orchards");
+            return res;
+          }}
+        >
+          即將刪除 <b>{o.nameZh}</b>，無法復原。
+        </CodeModal>
+      )}
+
+      {!o.active && (
+        <div className="mb-4 rounded-xl border border-stone-300 bg-stone-100 p-4 text-sm text-stone-700">
+          <span className="font-semibold">此果園已關閉</span>
+          {o.closedReason && <div className="mt-1 whitespace-pre-wrap">關閉原因：{o.closedReason}</div>}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="面積" value={`${orchardArea(o).toFixed(1)} 分`} sub={`${o.parcels.length} 筆地號`} />
         <StatCard label="果樹總數" value={`${orchardTrees(o)} 棵`} />
         <StatCard label={`${year} 水費`} value={money(water)} />
-        <StatCard label={`${year} 電費`} value={money(elec)} sub={o.electricityNo && `電號 ${o.electricityNo}`} />
+        <StatCard label={`${year} 電費`} value={money(elec)} sub={`${o.meters.length} 個電錶`} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -146,6 +163,19 @@ export default function OrchardDetail() {
                 src={`https://maps.google.com/maps?q=${firstGeo.lat},${firstGeo.lng}&z=16&output=embed`}
               />
             )}
+          </Card>
+
+          <Card title="電錶">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {o.meters.map((m, i) => (
+                <div key={m.id} className="rounded-lg bg-stone-50 p-3">
+                  <div className="text-xs text-stone-500">電錶號碼 {i + 1}</div>
+                  <div className="mb-2 font-semibold text-stone-800">{m.no || "（未填）"}</div>
+                  {m.photos.length ? <Gallery photos={m.photos} /> : <div className="text-sm text-stone-400">沒有照片</div>}
+                </div>
+              ))}
+              {!o.meters.length && <div className="text-sm text-stone-400">尚未登記電錶</div>}
+            </div>
           </Card>
 
           <Card title="種植果樹">

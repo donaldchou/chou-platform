@@ -14,6 +14,15 @@ const ParcelSchema = new Schema(
   sub,
 );
 
+const MeterSchema = new Schema(
+  {
+    id: idField,
+    no: str, // 電錶號碼
+    photos,
+  },
+  sub,
+);
+
 const SeedlingsSchema = new Schema(
   { 苦桃苗: money, 甜柿苗: money, 李子苗: money },
   sub,
@@ -23,6 +32,8 @@ const OrchardSchema = new Schema({
   _id: idField,
   nameZh: { type: String, required: [true, "請填寫果園中文名稱"], trim: true },
   nameEn: str,
+  active: { type: Boolean, default: true }, // 果園啟用／關閉
+  closedReason: str, // 關閉原因
   photos,
   parcels: { type: [ParcelSchema], default: [] },
   acquisition: {
@@ -59,8 +70,7 @@ const OrchardSchema = new Schema({
     replant: { type: SeedlingsSchema, default: () => ({}) }, // 待重新種植
   },
   waterPipePhotos: photos, // 水塔管線照片
-  electricityNo: str, // 電號
-  electricityPhotos: photos,
+  meters: { type: [MeterSchema], default: [] }, // 電錶
 });
 
 export const OrchardModel = defineModel("Orchard", OrchardSchema, "orchards");

@@ -186,15 +186,25 @@ export async function removeWithCode<K extends Coll>(
   code: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (me?.role !== "admin") return { ok: false, error: READ_ONLY };
+  const url = `/api/${key}/${encodeURIComponent(id)}`;
   try {
-    await api(`/api/${key}/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      headers: codeHeader(code),
-    });
+    await api(url, { method: "DELETE", headers: codeHeader(code) });
     setLocal({ ...state, [key]: (state[key] as Item<K>[]).filter((x) => x.id !== id) });
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    // 果園底下還有紀錄：再確認是否一併刪除（驗證碼已經通過）
+    const err = e as Error & { status?: number; data?: { needsCascade?: boolean } };
+    if (err.status === 409 && err.data?.needsCascade) {
+      if (!confirm(err.message)) return { ok: false, error: "已取消刪除" };
+      try {
+        await api(`${url}?cascade=true`, { method: "DELETE", headers: codeHeader(code) });
+        await reload();
+        return { ok: true };
+      } catch (e2) {
+        return { ok: false, error: e2 instanceof Error ? e2.message : String(e2) };
+      }
+    }
+    return { ok: false, error: err.message };
   }
 }
 

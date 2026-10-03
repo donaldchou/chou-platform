@@ -3,16 +3,45 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Plus, Trash2 } from "lucide-react";
-import { upsert } from "@/lib/store";
-import { FRUITS, LAND_TYPES, type LandType, type Orchard, type Seedlings } from "@/lib/types";
+import { upsert, useDB, verifyCode } from "@/lib/store";
+import { emptyMeter } from "@/lib/defaults";
+import { FRUITS, LAND_TYPES, type LandType, type Meter, type Orchard, type Seedlings } from "@/lib/types";
 import { daysUntil, uid } from "@/lib/utils";
-import { Button, Card, Field, Input, NumInput, PhotoUpload, Select } from "./ui";
+import { CodeModal } from "./code-modal";
+import { Button, Card, Field, Input, NumInput, PhotoUpload, Select, Textarea } from "./ui";
 
 const SEEDLINGS: (keyof Seedlings)[] = ["苦桃苗", "甜柿苗", "李子苗"];
 
-export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boolean }) {
+/** 新增／修改果園要先輸入驗證碼，通過後才顯示表單（後端儲存時也會再檢查） */
+export function OrchardFormGate({ initial, isNew }: { initial: Orchard; isNew: boolean }) {
   const router = useRouter();
-  const [o, setO] = useState<Orchard>(initial);
+  const [code, setCode] = useState<string | null>(null);
+
+  if (code !== null) return <OrchardForm initial={initial} isNew={isNew} code={code} />;
+  return (
+    <CodeModal
+      title={isNew ? "新增果園" : "修改果園"}
+      confirmLabel="下一步"
+      onClose={() => router.push(isNew ? "/orchards" : `/orchards/${initial.id}`)}
+      onSubmit={async (c) => {
+        const res = await verifyCode("orchards", isNew ? "create" : "update", c);
+        if (res.ok) setCode(c);
+        return res;
+      }}
+    >
+      {isNew ? "新增果園需要驗證碼。" : <>修改 <b>{initial.nameZh}</b> 需要驗證碼。</>}
+    </CodeModal>
+  );
+}
+
+/** code：開啟表單前已驗證過的驗證碼，儲存時一起送給後端 */
+function OrchardForm({ initial, isNew, code }: { initial: Orchard; isNew: boolean; code: string }) {
+  const router = useRouter();
+  const db = useDB();
+  // 頁面上至少要有一個電錶
+  const [o, setO] = useState<Orchard>(() =>
+    initial.meters?.length ? initial : { ...initial, meters: [emptyMeter()] },
+  );
   const set = <K extends keyof Orchard>(k: K, v: Orchard[K]) => setO((p) => ({ ...p, [k]: v }));
 
   const [saving, setSaving] = useState(false);
@@ -23,7 +52,8 @@ export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boole
       return;
     }
     setSaving(true);
-    const ok = await upsert("orchards", o);
+    // 重新啟用時清掉關閉原因
+    const ok = await upsert("orchards", o.active ? { ...o, closedReason: "" } : o, { code });
     setSaving(false);
     if (ok) router.push(`/orchards/${o.id}`);
   }
@@ -40,6 +70,36 @@ export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boole
           <Field label="果園名稱（英文）">
             <Input value={o.nameEn} onChange={(e) => set("nameEn", e.target.value)} placeholder="e.g. Lishan No.1" />
           </Field>
+          <Field label="果園狀態" group className="sm:col-span-2">
+            <div className="flex gap-2">
+              {[true, false].map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  onClick={() => set("active", v)}
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                    o.active === v
+                      ? v
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-stone-600 bg-stone-600 text-white"
+                      : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+                  }`}
+                >
+                  {v ? "果園啟用" : "果園關閉"}
+                </button>
+              ))}
+            </div>
+          </Field>
+          {!o.active && (
+            <Field label="關閉原因" className="sm:col-span-2">
+              <Textarea
+                rows={3}
+                value={o.closedReason}
+                onChange={(e) => set("closedReason", e.target.value)}
+                placeholder="例：合約到期不續租"
+              />
+            </Field>
+          )}
           <Field label="果園照片" group className="sm:col-span-2">
             <PhotoUpload folder="orchards" value={o.photos} onChange={(v) => set("photos", v)} />
           </Field>
@@ -107,6 +167,50 @@ export function OrchardForm({ initial, isNew }: { initial: Orchard; isNew: boole
                     </button>
                   )}
                 </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card
+        title="電錶（電費繳費用）"
+        action={
+          <Button size="sm" variant="secondary" onClick={() => set("meters", [...o.meters, emptyMeter()])}>
+            <Plus size={14} /> 新增電錶
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          {o.meters.map((m, i) => {
+            const upd = (patch: Partial<Meter>) =>
+              set("meters", o.meters.map((x) => (x.id === m.id ? { ...x, ...patch } : x)));
+            return (
+              <div key={m.id} className="space-y-3 rounded-lg bg-stone-50 p-3">
+                <div className="flex items-end gap-2">
+                  <Field label={`電錶號碼 ${i + 1}`} className="max-w-sm flex-1">
+                    <Input value={m.no} onChange={(e) => upd({ no: e.target.value })} placeholder="例：07-12-3456-78-9" />
+                  </Field>
+                  {o.meters.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const used = db.bills.filter((b) => b.meterId === m.id).length;
+                        const warn = used ? `\n有 ${used} 筆電費紀錄綁定這個電錶，移除後會顯示為「已移除的電錶」。` : "";
+                        if (confirm(`確定移除電錶「${m.no || i + 1}」和它的照片嗎？（按儲存後才會生效）${warn}`)) {
+                          set("meters", o.meters.filter((x) => x.id !== m.id));
+                        }
+                      }}
+                      className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                      title="移除電錶"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                </div>
+                <Field label="電錶照片（電表／電費單）" group>
+                  <PhotoUpload folder="orchards" value={m.photos} onChange={(v) => upd({ photos: v })} />
+                </Field>
               </div>
             );
           })}

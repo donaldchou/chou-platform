@@ -25,6 +25,7 @@ const BillSchema = new Schema({
   month: ym, // 繳費月份
   amount: money,
   cycle: str, // 週期
+  meterId: str, // 電費：果園裡的哪一個電錶
   photos,
   note: str,
 });

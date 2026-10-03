@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { remove, upsert, useDB } from "@/lib/store";
 import type { Bill, BillKind } from "@/lib/types";
@@ -11,6 +12,7 @@ import {
   Card,
   EditOnly,
   Field,
+  Gallery,
   Input,
   Modal,
   NumInput,
@@ -59,15 +61,22 @@ export function BillsPage({ kind }: { kind: BillKind }) {
 
   const orchard = db.orchards.find((o) => o.id === orchardId);
   const orchardName = (id: string) => db.orchards.find((o) => o.id === id)?.nameZh ?? "（已刪除）";
+  const meterNo = (b: Bill) => {
+    if (!b.meterId) return <span className="text-stone-400">—</span>;
+    const m = db.orchards.find((o) => o.id === b.orchardId)?.meters.find((x) => x.id === b.meterId);
+    return m ? m.no || "（未填號碼）" : <span className="text-stone-400">已移除的電錶</span>;
+  };
 
   function newBill(): Bill {
+    const o = orchard ?? db.orchards[0];
     return {
       id: uid(),
-      orchardId: orchard?.id ?? db.orchards[0]?.id ?? "",
+      orchardId: o?.id ?? "",
       kind,
       month: thisMonth(),
       amount: 0,
       cycle: kind === "water" ? "每月" : "雙月",
+      meterId: kind === "electricity" ? (o?.meters[0]?.id ?? "") : "",
       photos: [],
       note: "",
     };
@@ -103,25 +112,38 @@ export function BillsPage({ kind }: { kind: BillKind }) {
         </Select>
       </div>
 
-      {orchard && (
-        <Card title={kind === "water" ? `${orchard.nameZh}・水塔管線照片` : `${orchard.nameZh}・電號資料`} className="mb-6">
-          {kind === "electricity" && (
-            <Field label="電號" className="mb-3 max-w-xs">
-              <Input
-                value={orchard.electricityNo}
-                onChange={(e) => upsert("orchards", { ...orchard, electricityNo: e.target.value })}
-              />
-            </Field>
-          )}
-          <Field label={kind === "water" ? "水塔管線照片" : "電號照片（電表／電費單）"} group>
+      {orchard && kind === "water" && (
+        <Card title={`${orchard.nameZh}・水塔管線照片`} className="mb-6">
+          <Field label="水塔管線照片" group>
             <PhotoUpload
               folder="orchards"
-              value={kind === "water" ? orchard.waterPipePhotos : orchard.electricityPhotos}
-              onChange={(v) =>
-                upsert("orchards", kind === "water" ? { ...orchard, waterPipePhotos: v } : { ...orchard, electricityPhotos: v })
-              }
+              value={orchard.waterPipePhotos}
+              onChange={(v) => upsert("orchards", { ...orchard, waterPipePhotos: v })}
             />
           </Field>
+        </Card>
+      )}
+      {orchard && kind === "electricity" && (
+        <Card
+          title={`${orchard.nameZh}・電錶`}
+          className="mb-6"
+          action={
+            <EditOnly>
+              <Link href={`/orchards/${orchard.id}/edit`} className="text-sm text-emerald-700 hover:underline">
+                到果園資料編輯電錶
+              </Link>
+            </EditOnly>
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            {orchard.meters.map((m, i) => (
+              <div key={m.id} className="rounded-lg bg-stone-50 p-3">
+                <div className="text-xs text-stone-500">電錶號碼 {i + 1}</div>
+                <div className="mb-2 font-semibold text-stone-800">{m.no || "（未填）"}</div>
+                {m.photos.length ? <Gallery photos={m.photos} /> : <div className="text-sm text-stone-400">沒有照片</div>}
+              </div>
+            ))}
+          </div>
         </Card>
       )}
 
@@ -146,11 +168,12 @@ export function BillsPage({ kind }: { kind: BillKind }) {
       </div>
 
       <h2 className="mb-3 mt-8 font-semibold text-stone-800">繳費登記（{year}）</h2>
-      <Table head={["繳費月份", "果園", "費用", "週期", "照片", "備註", ""]}>
+      <Table head={["繳費月份", "果園", ...(kind === "electricity" ? ["電錶號碼"] : []), "費用", "週期", "照片", "備註", ""]}>
         {inYear.map((b) => (
           <tr key={b.id} className="hover:bg-stone-50">
             <Td>{b.month}</Td>
             <Td>{orchardName(b.orchardId)}</Td>
+            {kind === "electricity" && <Td>{meterNo(b)}</Td>}
             <Td className="font-medium">{money(b.amount)}</Td>
             <Td>{b.cycle}</Td>
             <Td>{b.photos[0] ? <Thumb src={b.photos[0]} photos={b.photos} showCount /> : <span className="text-stone-400">—</span>}</Td>
@@ -174,7 +197,7 @@ export function BillsPage({ kind }: { kind: BillKind }) {
         ))}
         {!inYear.length && (
           <tr>
-            <Td colSpan={7} className="py-8 text-center text-stone-400">這一年還沒有繳費紀錄</Td>
+            <Td colSpan={kind === "electricity" ? 8 : 7} className="py-8 text-center text-stone-400">這一年還沒有繳費紀錄</Td>
           </tr>
         )}
       </Table>
@@ -193,6 +216,7 @@ export function BillsPage({ kind }: { kind: BillKind }) {
 function BillModal({ bill, onClose, title }: { bill: Bill; onClose: () => void; title: string }) {
   const db = useDB();
   const [b, setB] = useState(bill);
+  const meters = db.orchards.find((o) => o.id === b.orchardId)?.meters ?? [];
   return (
     <Modal
       open
@@ -214,12 +238,30 @@ function BillModal({ bill, onClose, title }: { bill: Bill; onClose: () => void; 
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="果園" className="sm:col-span-2">
-          <Select value={b.orchardId} onChange={(e) => setB({ ...b, orchardId: e.target.value })}>
+          <Select
+            value={b.orchardId}
+            onChange={(e) => {
+              const orchardId = e.target.value;
+              // 換果園時，電錶改成新果園的第一個
+              const first = db.orchards.find((o) => o.id === orchardId)?.meters[0]?.id ?? "";
+              setB({ ...b, orchardId, meterId: b.kind === "electricity" ? first : "" });
+            }}
+          >
             {db.orchards.map((o) => (
               <option key={o.id} value={o.id}>{o.nameZh}</option>
             ))}
           </Select>
         </Field>
+        {b.kind === "electricity" && (
+          <Field label="電錶號碼" className="sm:col-span-2">
+            <Select value={b.meterId} onChange={(e) => setB({ ...b, meterId: e.target.value })}>
+              {!meters.some((m) => m.id === b.meterId) && <option value={b.meterId}>{b.meterId ? "已移除的電錶" : "（未選擇）"}</option>}
+              {meters.map((m, i) => (
+                <option key={m.id} value={m.id}>{m.no || `電錶 ${i + 1}（未填號碼）`}</option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label="繳費月份">
           <Input type="month" value={b.month} onChange={(e) => setB({ ...b, month: e.target.value })} />
         </Field>

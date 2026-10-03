@@ -1,5 +1,7 @@
-import type { Orchard } from "./types";
+import type { Meter, Orchard } from "./types";
 import { uid } from "./utils";
+
+export const emptyMeter = (): Meter => ({ id: uid(), no: "", photos: [] });
 
 /** 新增果園表單的空白資料 */
 export function emptyOrchard(): Orchard {
@@ -7,6 +9,8 @@ export function emptyOrchard(): Orchard {
     id: uid(),
     nameZh: "",
     nameEn: "",
+    active: true,
+    closedReason: "",
     photos: [],
     parcels: [{ id: uid(), landNo: "", lat: "", lng: "", landType: "農牧", areaFen: 0 }],
     acquisition: { cost: 0, date: "", name: "", phone: "" },
@@ -21,7 +25,6 @@ export function emptyOrchard(): Orchard {
       replant: { 苦桃苗: 0, 甜柿苗: 0, 李子苗: 0 },
     },
     waterPipePhotos: [],
-    electricityNo: "",
-    electricityPhotos: [],
+    meters: [emptyMeter()],
   };
 }

@@ -18,6 +18,7 @@ npm run dev
 MONGODB_URI=mongodb+srv://...     # 必填
 BLOB_READ_WRITE_TOKEN=...         # 必填，照片存放（Vercel Blob，private store）
 GEMINI_API_KEY=...                # 選填，噴藥 AI 建議；沒設定時使用內建建議
+ORCHARD_CODE=...                  # 必填，新增／編輯／刪除果園時要輸入的驗證碼
 SUPPLIER_CODE=...                 # 必填，新增／編輯／刪除貨源店家時要輸入的驗證碼
 FERTILIZER_CODE=...               # 必填，新增／編輯／刪除肥料時要輸入的驗證碼
 PESTICIDE_CODE=...                # 必填，新增／編輯／刪除農藥時要輸入的驗證碼
@@ -61,8 +62,8 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 
 | 集合 | Model | 內容 |
 |---|---|---|
-| `orchards` | Orchard | 果園：中英文名稱、照片、地號（經緯度／地目／面積）、取得資訊、合約、果樹數量、水塔、馬達、噴藥管線、電網、待嫁接／待重新種植、水塔管線照片、電號 |
-| `bills` | Bill | 水費／電費繳費單（`kind`: water / electricity） |
+| `orchards` | Orchard | 果園：中英文名稱、照片、地號（經緯度／地目／面積）、取得資訊、合約、果樹數量、水塔、馬達、噴藥管線、電網、待嫁接／待重新種植、水塔管線照片、啟用／關閉（關閉原因）、電錶（`meters`：號碼＋照片，可多個） |
+| `bills` | Bill | 水費／電費繳費單（`kind`: water / electricity；電費用 `meterId` 綁定果園的電錶） |
 | `bagging` | Bagging | 套袋：員工、紙袋箱數、外請工人、進場紀錄、便當、每袋工資、工資結算 |
 | `harvests` | Harvest | 採收開始／結束 |
 | `fertilizing` | Fertilizing | 施肥：肥料與每棵樹用量、包數、對象、員工、參考照片 |
@@ -96,7 +97,7 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 - **關聯檢查**：紀錄的 `orchardId`、薪水／分紅／工作的 `employeeId` 必須存在。
 - **資材價格歷史**：價格變動時，後端自動把舊價格加進 `priceHistory`，並更新「資訊異動時間」。
 - **刪除果園**：底下還有紀錄時回 409 和各類紀錄筆數；帶 `?cascade=true` 才會一併刪除。
-- **驗證碼**：新增／編輯／刪除貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`）、噴藥紀錄（`SPRAYING_CODE`）與施肥紀錄（`FERTILIZING_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
+- **驗證碼**：新增／編輯／刪除果園（`ORCHARD_CODE`；只改水塔管線照片不需要）、貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`）、噴藥紀錄（`SPRAYING_CODE`）與施肥紀錄（`FERTILIZING_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
 - **照片**：瀏覽器先壓縮成 JPEG（最長邊 1600px），上傳到 Vercel Blob 的 `chou-platform/<folder>/`，MongoDB 只存檔案網址（base64 會被拒絕）。編輯時移除的照片、刪除資料（含果園連帶刪除的紀錄）時的照片，會自動從 Blob 刪除。
 
 ### 其他

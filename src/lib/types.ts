@@ -25,6 +25,8 @@ export interface Orchard {
   id: ID;
   nameZh: string;
   nameEn: string;
+  active: boolean; // 果園啟用／關閉
+  closedReason: string; // 關閉原因
   photos: string[];
   parcels: Parcel[];
   acquisition: { cost: number; date: string; name: string; phone: string };
@@ -42,8 +44,14 @@ export interface Orchard {
   };
   todo: { graft: Seedlings; replant: Seedlings };
   waterPipePhotos: string[];
-  electricityNo: string;
-  electricityPhotos: string[];
+  meters: Meter[]; // 電錶（至少一個）
+}
+
+/** 電錶：電錶號碼＋照片，電費繳費單會綁定到電錶 */
+export interface Meter {
+  id: ID;
+  no: string;
+  photos: string[];
 }
 
 export type BillKind = "water" | "electricity";
@@ -55,6 +63,7 @@ export interface Bill {
   month: string; // YYYY-MM
   amount: number;
   cycle: string;
+  meterId: ID; // 電費：哪一個電錶（水費為空）
   photos: string[];
   note: string;
 }

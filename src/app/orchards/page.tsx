@@ -11,7 +11,7 @@ import { contractStatus, orchardArea, orchardTrees, photoSrc } from "@/lib/utils
 
 type View = "grid" | "list";
 
-/** 果樹種類＋電網標籤（區塊與列表共用） */
+/** 果樹種類＋電網標籤（卡片與清單共用） */
 function OrchardTags({ o }: { o: Orchard }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -153,8 +153,8 @@ export default function OrchardsPage() {
             <div className="flex rounded-lg border border-stone-300 bg-white p-0.5" role="group" aria-label="顯示方式">
               {(
                 [
-                  { v: "list", label: "列表", icon: List },
-                  { v: "grid", label: "區塊", icon: LayoutGrid },
+                  { v: "list", label: "清單", icon: List },
+                  { v: "grid", label: "卡片", icon: LayoutGrid },
                 ] as const
               ).map(({ v, label, icon: Icon }) => (
                 <button

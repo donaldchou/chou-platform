@@ -29,16 +29,16 @@ import {
 const padContacts = (list: SupplierContact[] = []) =>
   Array.from({ length: SUPPLIER_CONTACTS }, (_, i) => list[i] ?? { name: "", phone: "" });
 
-/* ---------------- 顯示方式（卡片／清單），記在這台電腦的瀏覽器 ---------------- */
+/* ---------------- 顯示方式（清單／卡片），記在這台電腦的瀏覽器 ---------------- */
 type View = "card" | "list";
 const VIEW_KEY = "chou-suppliers-view";
 const viewListeners = new Set<() => void>();
 
 function readView(): View {
   try {
-    return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "card";
+    return localStorage.getItem(VIEW_KEY) === "card" ? "card" : "list";
   } catch {
-    return "card";
+    return "list";
   }
 }
 
@@ -61,7 +61,7 @@ function useView(): [View, (v: View) => void] {
       return () => viewListeners.delete(l);
     },
     () => memoryView ?? readView(),
-    () => "card" as View,
+    () => "list" as View,
   );
   return [view, writeView];
 }
@@ -141,8 +141,8 @@ export default function SuppliersPage() {
           <div className="ml-auto flex rounded-lg border border-stone-300 bg-white p-0.5" role="group" aria-label="顯示方式">
             {(
               [
-                { v: "card", label: "卡片", icon: LayoutGrid },
                 { v: "list", label: "清單", icon: List },
+                { v: "card", label: "卡片", icon: LayoutGrid },
               ] as const
             ).map(({ v, label, icon: Icon }) => (
               <button

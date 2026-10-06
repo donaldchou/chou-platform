@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Wand2 } from "lucide-react";
 import { remove, upsert, useDB } from "@/lib/store";
 import type { BaggingRecord } from "@/lib/types";
-import { BENTO_PRICE, attendanceDays, money, todayStr, uid } from "@/lib/utils";
+import { BENTO_PRICE, attendanceDays, defaultOrchard, money, todayStr, uid } from "@/lib/utils";
 import {
   AttendanceEditor,
   BentoToggle,
@@ -42,7 +42,7 @@ export default function BaggingPage() {
   function create(): BaggingRecord {
     const d = todayStr();
     return {
-      id: uid(), orchardId: db.orchards[0]?.id ?? "", start: d, end: "", employeeIds: [], ownBoxes: [],
+      id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", start: d, end: "", employeeIds: [], ownBoxes: [],
       ownRemainingBags: 0, workerIds: [], attendance: [], bentoMode: "便當", externalBoxes: [],
       externalRemainingBags: 0, pricePerBag: 1, wages: [],
     };

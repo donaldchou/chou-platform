@@ -9,7 +9,7 @@ import { Button, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } fr
 import { STAGES } from "@/lib/spray-advice";
 import { useDB } from "@/lib/store";
 import type { SprayingRecord } from "@/lib/types";
-import { fmtDT, materialCost, materialName, money, nowStr, orchardLabel, uid } from "@/lib/utils";
+import { defaultOrchard, fmtDT, materialCost, materialName, money, nowStr, orchardLabel, uid } from "@/lib/utils";
 
 export default function SprayingPage() {
   const db = useDB();
@@ -25,7 +25,7 @@ export default function SprayingPage() {
   const open = (record: SprayingRecord) => ({ kind: "spraying" as const, record });
 
   const create = (): SprayingRecord => ({
-    id: uid(), orchardId: db.orchards[0]?.id ?? "", datetime: nowStr(), waterLiters: 500, items: [], targets: [],
+    id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", datetime: nowStr(), waterLiters: 500, items: [], targets: [],
     otherTarget: "", stage: STAGES[3], aiSuggestion: "", employeeIds: [], note: "",
   });
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { remove, upsert, useDB } from "@/lib/store";
 import type { Bill, BillKind } from "@/lib/types";
-import { money, thisMonth, todayStr, uid } from "@/lib/utils";
+import { defaultOrchard, money, thisMonth, todayStr, uid } from "@/lib/utils";
 import {
   BarChart,
   Button,
@@ -68,7 +68,7 @@ export function BillsPage({ kind }: { kind: BillKind }) {
   };
 
   function newBill(): Bill {
-    const o = orchard ?? db.orchards[0];
+    const o = orchard ?? defaultOrchard(db.orchards);
     return {
       id: uid(),
       orchardId: o?.id ?? "",

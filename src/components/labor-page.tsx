@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Wand2 } from "lucide-react";
 import { remove, upsert, useDB } from "@/lib/store";
 import type { LaborKind, LaborRecord } from "@/lib/types";
-import { BENTO_PRICE, attendanceDays, daySpan, money, todayStr, uid } from "@/lib/utils";
+import { BENTO_PRICE, attendanceDays, daySpan, defaultOrchard, money, todayStr, uid } from "@/lib/utils";
 import {
   AttendanceEditor,
   BentoToggle,
@@ -44,7 +44,7 @@ export function LaborPage({ kind }: { kind: LaborKind }) {
   const yearCost = list.filter((r) => r.start.startsWith(year)).reduce((s, r) => s + total(r), 0);
 
   const create = (): LaborRecord => ({
-    id: uid(), kind, orchardId: db.orchards[0]?.id ?? "", start: todayStr(), end: "",
+    id: uid(), kind, orchardId: defaultOrchard(db.orchards)?.id ?? "", start: todayStr(), end: "",
     employeeIds: [], workers: [], attendance: [], bentoMode: "便當", wages: [],
   });
 

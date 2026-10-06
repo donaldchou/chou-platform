@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { remove, upsert, useDB } from "@/lib/store";
 import { FRUITS, type HarvestRecord } from "@/lib/types";
-import { daySpan, todayStr, uid } from "@/lib/utils";
+import { daySpan, defaultOrchard, todayStr, uid } from "@/lib/utils";
 import { OrchardSelect } from "@/components/record-parts";
 import {
   Badge,
@@ -33,7 +33,7 @@ export default function HarvestPage() {
         action={
           <Button
             onClick={() =>
-              setEditing({ id: uid(), orchardId: db.orchards[0]?.id ?? "", fruit: FRUITS[0], start: todayStr(), end: "", note: "" })
+              setEditing({ id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", fruit: FRUITS[0], start: todayStr(), end: "", note: "" })
             }
           >
             <Plus size={16} /> 新增採收紀錄

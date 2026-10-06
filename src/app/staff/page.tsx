@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { remove, upsert, useDB } from "@/lib/store";
 import { TASK_STATUSES, type Bonus, type Employee, type Salary, type Task, type TaskStatus } from "@/lib/types";
-import { fmtDT, money, nowStr, thisMonth, todayStr, uid } from "@/lib/utils";
+import { defaultOrchard, fmtDT, money, nowStr, thisMonth, todayStr, uid } from "@/lib/utils";
 import {
   Badge,
   Button,
@@ -110,7 +110,7 @@ function TasksTab() {
           <Button
             onClick={() =>
               setEditing({
-                id: uid(), employeeId: db.employees[0]?.id ?? "", orchardId: db.orchards[0]?.id ?? "", category: "噴藥",
+                id: uid(), employeeId: db.employees[0]?.id ?? "", orchardId: defaultOrchard(db.orchards)?.id ?? "", category: "噴藥",
                 title: "", dueDate: todayStr(), status: "待處理", report: "", reportedAt: "",
               })
             }

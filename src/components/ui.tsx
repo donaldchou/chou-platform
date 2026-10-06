@@ -159,7 +159,8 @@ export function PrintArea({ className = "", children }: { className?: string; ch
   );
 }
 
-export type SearchOption = { value: string; label: string; group?: string; keywords?: string };
+/** groupClass：分組標題的文字顏色（Tailwind class），預設灰色 */
+export type SearchOption = { value: string; label: string; group?: string; groupClass?: string; keywords?: string };
 
 /**
  * 可以打字搜尋的下拉選單：點開後輸入關鍵字（空白分隔可多個）即時篩選，
@@ -245,7 +246,7 @@ export function SearchSelect({
           {shown.map((o, i) => (
             <div key={o.value}>
               {o.group && o.group !== shown[i - 1]?.group && (
-                <div className="px-3 pb-1 pt-2 text-xs font-semibold text-stone-400">{o.group}</div>
+                <div className={`px-3 pb-1 pt-2 text-xs font-semibold ${o.groupClass ?? "text-stone-400"}`}>{o.group}</div>
               )}
               <button
                 type="button"

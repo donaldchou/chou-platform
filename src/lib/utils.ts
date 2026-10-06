@@ -89,6 +89,10 @@ export const orchardTrees = (o: Orchard) =>
 export const orchardLabel = (o?: Orchard) =>
   o ? `${o.nameZh}${o.nameEn ? ` (${o.nameEn})` : ""}` : "（已刪除的果園）";
 
+/** 新增紀錄時預設帶入的果園：第一個使用中的果園，全部關閉時才用第一個 */
+export const defaultOrchard = (orchards: Orchard[]): Orchard | undefined =>
+  orchards.find((o) => o.active !== false) ?? orchards[0];
+
 /** Cost of using `amount` (cc / g) of a material, based on its package price. */
 export function materialCost(m: Material | undefined, amount: number) {
   if (!m || !m.size) return 0;

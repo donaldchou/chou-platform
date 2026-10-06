@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, Sparkles } from "lucide-react";
 import { fetchSprayAdvice, upsert, useDB } from "@/lib/store";
 import { STAGES } from "@/lib/spray-advice";
 import type { Material, SprayingRecord } from "@/lib/types";
-import { fmtDT, materialCost, materialName, money, orchardLabel, uid } from "@/lib/utils";
+import { defaultOrchard, fmtDT, materialCost, materialName, money, orchardLabel, uid } from "@/lib/utils";
 import {
   DelBtn,
   EditorRows,
@@ -47,7 +47,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
   const materialOptions = [...pesticides.map(toOption("農藥")), ...ferts.map(toOption("肥料"))];
 
   // 參考過去的噴藥紀錄：選果園＋日期後，把配方等內容帶入目前表單（不會存進資料庫）
-  const [refOrchard, setRefOrchard] = useState(record.orchardId || db.orchards[0]?.id || "");
+  const [refOrchard, setRefOrchard] = useState(record.orchardId || defaultOrchard(db.orchards)?.id || "");
   const [refId, setRefId] = useState("");
   const [refYear, setRefYear] = useState(""); // YYYY，空白＝全部
   const orchardRecords = db.spraying.filter((x) => x.orchardId === refOrchard && x.id !== record.id);

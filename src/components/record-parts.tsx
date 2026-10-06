@@ -2,23 +2,27 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useDB } from "@/lib/store";
-import type { Attendance, BentoMode, BoxUsage } from "@/lib/types";
+import type { Attendance, BentoMode, BoxUsage, Orchard } from "@/lib/types";
 import { FRUITS } from "@/lib/types";
 import { BAG_TYPES, BENTO_PRICE, bagsPerBox, hoursBetween, todayStr, uid } from "@/lib/utils";
-import { Button, ChipSelect, Field, Input, NumInput, Select } from "./ui";
+import { Button, ChipSelect, Field, Input, NumInput, SearchSelect, Select } from "./ui";
 
+/** 果園選單：可打字搜尋中文或英文名稱；使用中的果園排前面，已關閉的另成一群 */
 export function OrchardSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const db = useDB();
+  const option = (group: string, groupClass: string) => (o: Orchard) => ({
+    value: o.id,
+    label: `${o.nameZh}${o.nameEn ? `（${o.nameEn}）` : ""}`,
+    group,
+    groupClass,
+  });
+  const options = [
+    ...db.orchards.filter((o) => o.active !== false).map(option("使用中", "text-emerald-600")),
+    ...db.orchards.filter((o) => o.active === false).map(option("已關閉", "text-red-600")),
+  ];
   return (
     <Field label="果園名稱">
-      <Select value={value} onChange={(e) => onChange(e.target.value)}>
-        {db.orchards.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.nameZh}
-            {o.nameEn ? `（${o.nameEn}）` : ""}
-          </option>
-        ))}
-      </Select>
+      <SearchSelect value={value} options={options} onChange={onChange} />
     </Field>
   );
 }

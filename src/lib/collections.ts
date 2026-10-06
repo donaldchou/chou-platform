@@ -2,7 +2,7 @@ import type { Model } from "mongoose";
 import type { DB } from "./types";
 import { OrchardModel } from "@/models/orchard";
 import { BonusModel, EmployeeModel, SalaryModel, TaskModel, WorkerModel } from "@/models/people";
-import { MaterialModel, SupplierModel } from "@/models/supply";
+import { MaterialModel, StockModel, SupplierModel } from "@/models/supply";
 import {
   BaggingModel,
   BillModel,
@@ -20,6 +20,7 @@ export const COLLECTIONS: Record<keyof DB, Model<unknown>> = {
   workers: WorkerModel,
   suppliers: SupplierModel,
   materials: MaterialModel,
+  stock: StockModel,
   bagging: BaggingModel,
   harvests: HarvestModel,
   fertilizing: FertilizingModel,
@@ -38,6 +39,7 @@ export const isCollection = (name: string): name is CollectionName => name in CO
 export const FILTERS: Partial<Record<CollectionName, string[]>> = {
   bills: ["orchardId", "kind"],
   materials: ["category", "supplierId"],
+  stock: ["materialId", "category", "kind"],
   bagging: ["orchardId"],
   harvests: ["orchardId"],
   fertilizing: ["orchardId"],
@@ -62,6 +64,7 @@ export const ORCHARD_CHILDREN: CollectionName[] = [
 /** 列表預設排序（新的在前） */
 export const SORT: Partial<Record<CollectionName, Record<string, 1 | -1>>> = {
   bills: { month: -1 },
+  stock: { datetime: -1 },
   bagging: { start: -1 },
   harvests: { start: -1 },
   fertilizing: { datetime: -1 },

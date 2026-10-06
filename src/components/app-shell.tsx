@@ -26,6 +26,7 @@ import {
   Trees,
   UserRound,
   Users,
+  Warehouse,
   X,
   Zap,
 } from "lucide-react";
@@ -57,6 +58,7 @@ const NAV = [
       { href: "/materials/pesticides", label: "農藥", icon: FlaskConical },
       { href: "/materials/fertilizers", label: "肥料", icon: Leaf },
       { href: "/materials/packaging", label: "包材 / 乾貨", icon: Package },
+      { href: "/materials/stock", label: "庫存數量", icon: Warehouse },
     ],
   },
   {

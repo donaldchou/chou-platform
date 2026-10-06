@@ -14,7 +14,7 @@ type Rule = {
 };
 
 /** 修改前後只有 fields 裡的欄位不同（updatedAt 等系統欄位不算） */
-function onlyChanged(before: Doc, after: Doc, fields: string[]) {
+export function onlyChanged(before: Doc, after: Doc, fields: string[]) {
   if (!before || !after) return false;
   const skip = new Set([...fields, "_id", "id", "__v", "createdAt", "updatedAt"]);
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
@@ -31,6 +31,25 @@ function canon(v: unknown): string {
   return JSON.stringify(v ?? null);
 }
 
+/** 農藥／肥料／包材各自的驗證碼，依資料的 category 決定 */
+const MATERIAL_RULES: Rule[] = [
+  {
+    env: "FERTILIZER_CODE",
+    actions: ["create", "update", "delete"],
+    applies: (doc) => doc.category === "fertilizer",
+  },
+  {
+    env: "PESTICIDE_CODE",
+    actions: ["create", "update", "delete"],
+    applies: (doc) => doc.category === "pesticide",
+  },
+  {
+    env: "PACKAGING_CODE",
+    actions: ["create", "update", "delete"],
+    applies: (doc) => doc.category === "packaging",
+  },
+];
+
 /** 需要驗證碼的操作 */
 const RULES: Partial<Record<string, Rule[]>> = {
   orchards: [
@@ -44,23 +63,9 @@ const RULES: Partial<Record<string, Rule[]>> = {
   suppliers: [{ env: "SUPPLIER_CODE", actions: ["create", "update", "delete"] }],
   spraying: [{ env: "SPRAYING_CODE", actions: ["create", "update", "delete"] }],
   fertilizing: [{ env: "FERTILIZING_CODE", actions: ["create", "update", "delete"] }],
-  materials: [
-    {
-      env: "FERTILIZER_CODE",
-      actions: ["create", "update", "delete"],
-      applies: (doc) => doc.category === "fertilizer",
-    },
-    {
-      env: "PESTICIDE_CODE",
-      actions: ["create", "update", "delete"],
-      applies: (doc) => doc.category === "pesticide",
-    },
-    {
-      env: "PACKAGING_CODE",
-      actions: ["create", "update", "delete"],
-      applies: (doc) => doc.category === "packaging",
-    },
-  ],
+  materials: MATERIAL_RULES,
+  // 庫存異動（進貨／盤點／報廢）用同一類資材的驗證碼
+  stock: MATERIAL_RULES,
 };
 
 export const CODE_HEADER = "x-verify-code";

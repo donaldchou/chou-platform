@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { useCanEdit, useDB } from "@/lib/store";
-import { fmtDT, materialCost, materialName, money } from "@/lib/utils";
+import { fertPacks, fertUnit, fmtDT, materialCost, materialName, money } from "@/lib/utils";
 import { useFertCost } from "./fert-modal";
 import { targetsText } from "./record-parts";
 import type { OpenRecord } from "./spray-calendar";
@@ -155,7 +155,7 @@ export function RecordCard({ open, showKind = true }: { open: OpenRecord; showKi
           Number(m?.dilution) > 0 ? `${m!.dilution} 倍` : "",
           i.gramsPerTree > 0 ? `每棵 ${i.gramsPerTree} g` : "",
           i.litersPerTree > 0 ? `每棵 ${i.litersPerTree} L${i.seconds ? `（約 ${i.seconds} 秒）` : ""}` : "",
-          `${i.packs} 包`,
+          `${i.amount} ${fertUnit(m)}${fertPacks(m, i.amount) ? `（約 ${fertPacks(m, i.amount)} 包）` : ""}`,
         ].filter(Boolean),
       };
     });
@@ -180,7 +180,7 @@ export function RecordCard({ open, showKind = true }: { open: OpenRecord; showKi
               <Thumb src={it.photos?.[0]} photos={it.photos} showCount className="h-10 w-10" />
               <div className="min-w-0">
                 <div className="truncate font-medium text-stone-800">
-                  {open.kind === "spraying" && `${n + 1}. `}{it.name}
+                  {n + 1}. {it.name}
                 </div>
                 <div className="text-xs text-stone-600">{it.detail.join("　·　")}</div>
               </div>

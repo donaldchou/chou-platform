@@ -7,6 +7,8 @@ import { assertNoInlineImages, collectBlobUrls, deleteBlobs } from "./blob";
 import type { DB } from "./types";
 import { OrchardModel } from "@/models/orchard";
 import { EmployeeModel } from "@/models/people";
+import { MaterialModel, StockModel } from "@/models/supply";
+import { onlyChanged } from "./codes";
 
 type Data = Record<string, unknown>;
 
@@ -21,6 +23,7 @@ const REFS: Partial<Record<CollectionName, { field: string; model: Model<unknown
   ],
   salaries: [{ field: "employeeId", model: EmployeeModel, label: "員工" }],
   bonuses: [{ field: "employeeId", model: EmployeeModel, label: "員工" }],
+  stock: [{ field: "materialId", model: MaterialModel, label: "資材" }],
 };
 
 async function checkRefs(name: CollectionName, data: Data) {
@@ -29,6 +32,11 @@ async function checkRefs(name: CollectionName, data: Data) {
     if (typeof value === "string" && value && !(await ref.model.exists({ _id: value }))) {
       throw new HttpError(400, `找不到${ref.label}（${value}）`);
     }
+  }
+  // 庫存異動的類別一律跟資材相同（驗證碼依類別決定，不能由前端指定）
+  if (name === "stock") {
+    const m = (await MaterialModel.findById(data.materialId).lean()) as Data | null;
+    if (m) data.category = m.category;
   }
 }
 
@@ -42,7 +50,9 @@ function applyMaterialRules(data: Data, existing: Data | null) {
     return;
   }
   data.createdAt = existing.createdAt;
-  data.updatedAt = today;
+  // 只在庫存頁改安全存量，不算資材資訊異動（只比較前端有送的欄位：舊資料缺的欄位會被補成預設值）
+  const sent = Object.fromEntries(Object.keys(data).map((k) => [k, existing[k]]));
+  data.updatedAt = onlyChanged(sent, data, ["minStock"]) ? existing.updatedAt : today;
   const history = (existing.priceHistory as { date: string; price: number }[]) ?? [];
   // 原價格是 0（通常是新增時還沒填價格）就不記錄，避免出現「前次 NT$ 0」
   const oldPrice = Number(existing.price);
@@ -151,6 +161,8 @@ export async function deleteDoc(
     }
     await Promise.all(ORCHARD_CHILDREN.map((c) => COLLECTIONS[c].deleteMany({ orchardId: id })));
   }
+  // 資材刪掉後，它的進貨／盤點／報廢紀錄也沒有意義了
+  if (name === "materials") await StockModel.deleteMany({ materialId: id });
 
   await Model.deleteOne({ _id: id });
   await deleteBlobs(photos);

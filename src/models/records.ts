@@ -67,6 +67,7 @@ const FertilizingSchema = new Schema({
   _id: idField,
   orchardId: orchardRef,
   datetime: dateTime,
+  waterLiters: money, // 水使用總量（公升）
   items: {
     type: [
       new Schema(
@@ -76,7 +77,7 @@ const FertilizingSchema = new Schema({
           gramsPerTree: money,
           litersPerTree: money,
           seconds: money,
-          packs: money,
+          amount: money, // 整體用量：液體 L，其他 kg
         },
         sub,
       ),

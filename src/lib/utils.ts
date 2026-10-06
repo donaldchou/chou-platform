@@ -93,15 +93,30 @@ export const orchardLabel = (o?: Orchard) =>
 export const defaultOrchard = (orchards: Orchard[]): Orchard | undefined =>
   orchards.find((o) => o.active !== false) ?? orchards[0];
 
+/** 每瓶／包的容量，換算成基本單位（cc／g／片） */
+export const materialBase = (m: Material) => (m.size || 0) * (m.unit === "kg" ? 1000 : 1);
+
 /** Cost of using `amount` (cc / g) of a material, based on its package price. */
 export function materialCost(m: Material | undefined, amount: number) {
   if (!m || !m.size) return 0;
-  const base = m.unit === "kg" ? m.size * 1000 : m.size;
-  return (m.price / base) * amount;
+  return (m.price / materialBase(m)) * amount;
+}
+
+/** 施肥的整體用量單位：液體（ml）用公升，其他用公斤 */
+export const fertUnit = (m?: Material) => (m?.unit === "ml" ? "L" : "kg");
+
+/** 施肥用量（L／kg）換算成幾包；沒設定每包容量時是 null */
+export function fertPacks(m: Material | undefined, amount: number) {
+  if (!m || !materialBase(m)) return null;
+  return Math.round(((amount * 1000) / materialBase(m)) * 100) / 100;
 }
 
 /** 資材 targets 欄位的名稱 */
 export const MATERIAL_TARGETS_LABEL = "成分說明";
+
+/** 員工參考卡用的照片：有指定而且還在照片裡就用它，否則用第一張 */
+export const cardPhotoOf = (m?: Material) =>
+  m?.cardPhoto && m.photos?.includes(m.cardPhoto) ? m.cardPhoto : m?.photos?.[0];
 
 export const materialName = (m?: Material) =>
   m ? `${m.nameZh}${m.nameEn ? ` (${m.nameEn})` : ""}` : "（已刪除）";

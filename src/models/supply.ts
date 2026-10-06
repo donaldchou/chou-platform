@@ -1,6 +1,6 @@
 import { Schema } from "mongoose";
 import { SUPPLIER_CONTACTS } from "@/lib/types";
-import { defineModel, idField, money, photos, str, sub, ymd } from "./_shared";
+import { dateTime, defineModel, idField, money, photos, str, sub, ymd } from "./_shared";
 
 /** 貨源店家 */
 const SupplierSchema = new Schema({
@@ -39,8 +39,27 @@ const MaterialSchema = new Schema({
   usagePeriod: str, // 使用時間
   bannedPeriod: str, // 禁用時間（紅字提醒）
   photos, // 照片（可多張）
+  cardPhoto: str, // 員工參考卡用的照片（photos 其中一張）
   supplierId: { type: String, ref: "Supplier", default: "", index: true }, // 購買地
+  minStock: money, // 安全存量（瓶／包數）
+  bagType: str, // 包材：對應套袋紀錄的紙袋類型
+});
+
+/** 庫存異動：進貨／盤點／報廢 */
+const StockSchema = new Schema({
+  _id: idField,
+  materialId: { type: String, ref: "Material", required: true, index: true },
+  category: { type: String, enum: ["pesticide", "fertilizer", "packaging"], required: true },
+  kind: { type: String, enum: ["purchase", "count", "scrap"], required: true },
+  datetime: { ...dateTime, required: [true, "請填寫日期"] },
+  qty: money, // 基本單位（cc／g／片）；盤點＝實際庫存總量
+  price: money, // 進貨總金額
+  expiry: ymd, // 有效期限
+  batch: str, // 批號
+  supplierId: { type: String, ref: "Supplier", default: "" },
+  note: str,
 });
 
 export const SupplierModel = defineModel("Supplier", SupplierSchema, "suppliers");
 export const MaterialModel = defineModel("Material", MaterialSchema, "materials");
+export const StockModel = defineModel("Stock", StockSchema, "stock");

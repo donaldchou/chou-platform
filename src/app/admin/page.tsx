@@ -300,6 +300,7 @@ const COLL_LABEL: Record<Coll, string> = {
   workers: "外請工人",
   suppliers: "貨源店家",
   materials: "資材（農藥／肥料／包材）",
+  stock: "庫存異動（進貨／盤點／報廢）",
   bagging: "套袋紀錄",
   harvests: "採收紀錄",
   fertilizing: "施肥紀錄",

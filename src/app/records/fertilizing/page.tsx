@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Plus, Printer, Share2 } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { FertilizingRecord } from "@/lib/types";
-import { defaultOrchard, fmtDT, materialName, money, orchardLabel, todayStr, uid } from "@/lib/utils";
+import { cardPhotoOf, defaultOrchard, fertPacks, fertUnit, fmtDT, money, todayStr, uid } from "@/lib/utils";
 import { useFertCost } from "@/components/fert-modal";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
-import { targetsText } from "@/components/record-parts";
+import { targetsText, targetsTextEn } from "@/components/record-parts";
 import { Button, Gallery, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } from "@/components/ui";
 
 export default function FertilizingPage() {
@@ -26,7 +26,7 @@ export default function FertilizingPage() {
 
   const create = (): FertilizingRecord => ({
     // 施肥通常一早出工，預設今天早上 08:00
-    id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", datetime: `${todayStr()}T08:00`, items: [], targets: [], otherTarget: "",
+    id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", datetime: `${todayStr()}T08:00`, waterLiters: 0, items: [], targets: [], otherTarget: "",
     employeeIds: [], photos: [], note: "",
   });
 
@@ -100,29 +100,40 @@ function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onCl
       <PrintArea className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
         <div>
           <div className="text-xs text-stone-500">施肥工作單</div>
-          <div className="text-xl font-bold">{orchardLabel(o)}</div>
+          {/* 果園、肥料名稱：中文一行、英文一行（給外籍員工看） */}
+          <div className="text-xl font-bold">{o?.nameZh ?? "（已刪除的果園）"}</div>
+          {o?.nameEn && <div className="text-base font-semibold text-stone-600">{o.nameEn}</div>}
           <div className="text-sm text-stone-600">施用時間：{fmtDT(r.datetime)}</div>
         </div>
-        <div className="text-sm"><b>對象：</b>{targetsText(r.targets, r.otherTarget)}</div>
-        <div className="space-y-2">
-          {r.items.map((it) => {
+        <div className="text-sm"><b>對象 Target：</b>{targetsTextEn(r.targets, r.otherTarget)}</div>
+        {r.waterLiters > 0 && (
+          <div className="rounded-lg bg-sky-50 p-2 text-base"><b>用水量 Water：</b>{r.waterLiters} 公升 L</div>
+        )}
+        <div className="space-y-1">
+          {r.items.map((it, i) => {
             const m = db.materials.find((x) => x.id === it.materialId);
+            const packs = fertPacks(m, it.amount);
             return (
-              <div key={it.id} className="flex gap-3 rounded-lg bg-stone-50 p-3">
-                <Thumb src={m?.photos?.[0]} photos={m?.photos} showCount className="h-16 w-16" />
+              <div key={it.id} className="flex items-center gap-3 rounded-lg bg-stone-50 p-1.5">
+                <Thumb src={cardPhotoOf(m)} photos={m?.photos} showCount className="h-28 w-28" />
                 <div className="text-sm">
-                  <div className="font-semibold">{materialName(m)}</div>
+                  <div className="font-semibold">{i + 1}. {m?.nameZh ?? "（已刪除）"}</div>
+                  {m?.nameEn && <div className="font-medium text-stone-600">{m.nameEn}</div>}
                   {it.gramsPerTree > 0 && <div>每棵樹 {it.gramsPerTree} 公克</div>}
                   {it.litersPerTree > 0 && <div>每棵樹 {it.litersPerTree} 公升，約 {it.seconds} 秒</div>}
-                  <div>共 {it.packs} 包</div>
+                  <div>
+                    整體用量 {it.amount} {fertUnit(m)}
+                    {packs !== null && it.amount > 0 && `（約 ${packs} 包）`}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
-        {r.note && <div className="text-sm"><b>注意事項：</b>{r.note}</div>}
+        {/* 保留輸入時的換行 */}
+        {r.note && <div className="whitespace-pre-line text-sm text-red-600"><b>注意事項 Notes：</b>{"\n"}{r.note}</div>}
         <div className="text-sm">
-          <b>負責員工：</b>
+          <b>負責員工 Staff：</b>
           {r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}
         </div>
         {r.photos.length > 0 && (

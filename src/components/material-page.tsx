@@ -5,7 +5,19 @@ import Link from "next/link";
 import { AlertTriangle, History, Plus, Search } from "lucide-react";
 import { remove, removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
 import type { Material, MaterialCategory, MaterialUnit } from "@/lib/types";
-import { MATERIAL_TARGETS_LABEL, UNIT_LABELS, UNIT_SHORT, money, todayStr, uid } from "@/lib/utils";
+import {
+  BAG_TYPES,
+  MATERIAL_TARGETS_LABEL,
+  UNIT_LABELS,
+  UNIT_SHORT,
+  bagsPerBox,
+  cardPhotoOf,
+  money,
+  photoSrc,
+  todayStr,
+  uid,
+} from "@/lib/utils";
+import { packWord } from "@/lib/stock";
 import { CodeModal } from "./code-modal";
 import {
   Badge,
@@ -36,6 +48,8 @@ type Meta = {
   needsCode: boolean;
   /** 顯示「製造廠商」欄位 */
   manufacturer?: boolean;
+  /** 可以選一張照片給員工參考卡用 */
+  cardPhoto?: boolean;
 };
 
 const META: Record<MaterialCategory, Meta> = {
@@ -48,6 +62,7 @@ const META: Record<MaterialCategory, Meta> = {
     title: "肥料", units: ["ml", "g", "kg"],
     props: ["殺細菌", "病毒", "殺蟲", "營養補充", "顆粒肥", "即溶粉狀肥", "液態肥", "高氮肥", "平均肥", "高鉀肥", "高磷鉀肥", "鈣肥", "硼肥", "微量元素肥"],
     targetsPlaceholder: "例：氮 15%、磷 15%、鉀 15%", createdLabel: "登錄時間", maxPhotos: 10, needsCode: true,
+    cardPhoto: true,
   },
   packaging: {
     title: "包材／乾貨", units: ["g", "kg", "片"], props: ["套袋", "包裝", "防潮", "資材"],
@@ -238,7 +253,7 @@ export function MaterialPage({ category }: { category: MaterialCategory }) {
             return res;
           }}
         >
-          即將刪除「<b>{deleting.nameZh}</b>」，照片也會一併刪除，無法復原。
+          即將刪除「<b>{deleting.nameZh}</b>」，照片和進貨／盤點／報廢紀錄也會一併刪除，無法復原。
         </CodeModal>
       )}
       {editing && (
@@ -275,8 +290,9 @@ function MaterialModal({
 
   function save() {
     if (!m.nameZh.trim()) return alert("請填寫中文名稱");
-    // 登錄／異動時間與歷史價格由後端維護
-    upsert("materials", m, { code });
+    // 登錄／異動時間與歷史價格由後端維護；參考卡照片被移除時改回預設（第一張）
+    const cardPhoto = m.cardPhoto && m.photos.includes(m.cardPhoto) ? m.cardPhoto : "";
+    upsert("materials", { ...m, cardPhoto }, { code });
     onClose();
   }
 
@@ -332,6 +348,28 @@ function MaterialModal({
           <Input value={m.dilution} onChange={(e) => set("dilution", e.target.value)} placeholder="例：2000" />
         </Field>
       </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-4">
+        <Field label={`安全存量（${packWord(m)}）`} hint="庫存低於這個數量時提醒">
+          <NumInput step="any" value={m.minStock ?? 0} onChange={(v) => set("minStock", v)} />
+        </Field>
+        {m.category === "packaging" && (
+          <Field label="套袋紙袋類型" hint="套袋紀錄用的紙袋會從這項扣庫存" className="sm:col-span-2">
+            <Select value={m.bagType ?? ""} onChange={(e) => set("bagType", e.target.value)}>
+              <option value="">（不是套袋紙袋）</option>
+              {BAG_TYPES.map((b) => (
+                <option key={b.type} value={b.type}>
+                  {b.type}紙袋（{b.perBox.toLocaleString()} 袋/箱）
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+      </div>
+      {m.bagType && m.unit === "片" && m.size !== bagsPerBox(m.bagType) && (
+        <p className="mt-2 text-xs text-amber-700">
+          建議把「重量／容量」設成每箱 {bagsPerBox(m.bagType).toLocaleString()} 片，庫存才會以「箱」顯示。
+        </p>
+      )}
       {!isNew && m.price !== material.price && material.price > 0 && (
         <p className="mt-2 text-xs text-amber-700">儲存後，原價格 {money(material.price)} 會記錄到歷史價格。</p>
       )}
@@ -363,6 +401,33 @@ function MaterialModal({
         <Field label={meta.maxPhotos > 1 ? "照片（可上傳多張）" : "照片"} group>
           <PhotoUpload folder="materials" max={meta.maxPhotos} value={m.photos ?? []} onChange={(v) => set("photos", v)} />
         </Field>
+        {meta.cardPhoto && (m.photos ?? []).length > 0 && (
+          <Field label="員工參考卡照片" hint="點一張照片選擇；沒選的話用第一張" group className="sm:col-span-2">
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="員工參考卡照片">
+              {m.photos.map((p) => {
+                const on = p === cardPhotoOf(m);
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => set("cardPhoto", p)}
+                    className={`relative h-20 w-20 overflow-hidden rounded-lg border-2 ${
+                      on ? "border-emerald-600 ring-2 ring-emerald-600/30" : "border-stone-200 opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photoSrc(p)} alt="" className="h-full w-full object-cover" />
+                    {on && (
+                      <span className="absolute bottom-0 inset-x-0 bg-emerald-600 text-center text-[10px] leading-4 text-white">參考卡</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        )}
         <Field
           label="購買地"
           hint={<Link href="/suppliers" className="text-emerald-700 underline">管理貨源店家</Link>}

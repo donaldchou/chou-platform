@@ -3,6 +3,14 @@ export type ID = string;
 export const FRUITS = ["甜桃", "水蜜桃", "李子", "甜柿"] as const;
 export type Fruit = (typeof FRUITS)[number];
 
+/** 果樹英文名稱（員工參考卡給外籍員工看） */
+export const FRUIT_EN: Record<Fruit, string> = {
+  甜桃: "Nectarine",
+  水蜜桃: "Peach",
+  李子: "Plum",
+  甜柿: "Persimmon",
+};
+
 export const LAND_TYPES = ["原保", "林", "農牧", "住"] as const;
 export type LandType = (typeof LAND_TYPES)[number];
 
@@ -125,7 +133,31 @@ export interface Material {
   usagePeriod: string;
   bannedPeriod: string;
   photos: string[];
+  /** 員工參考卡要顯示的照片（photos 其中一張）；空白＝用第一張 */
+  cardPhoto?: string;
   supplierId: ID;
+  /** 安全存量（瓶／包數），低於時在庫存頁顯示不足；0 或沒有＝未設定 */
+  minStock?: number;
+  /** 包材：對應套袋紀錄的紙袋類型（BAG_TYPES），套袋用的紙袋會自動從這項扣庫存 */
+  bagType?: string;
+}
+
+/** 庫存異動：進貨、盤點（填實際數量）、報廢；使用量由噴藥／施肥／套袋紀錄自動計算，不存在這裡 */
+export type StockKind = "purchase" | "count" | "scrap";
+
+export interface StockTxn {
+  id: ID;
+  materialId: ID;
+  category: MaterialCategory; // 跟資材相同，用來決定驗證碼
+  kind: StockKind;
+  datetime: string; // YYYY-MM-DDTHH:mm
+  /** 基本單位（cc／g／片）。進貨、報廢＝數量；盤點＝當時實際的庫存總量 */
+  qty: number;
+  price: number; // 進貨總金額
+  expiry: string; // 有效期限 YYYY-MM-DD（進貨）
+  batch: string; // 批號
+  supplierId: ID;
+  note: string;
 }
 
 export interface Attendance {
@@ -183,13 +215,15 @@ export interface FertItem {
   gramsPerTree: number;
   litersPerTree: number;
   seconds: number;
-  packs: number;
+  /** 整體用量：液體（ml）是公升，其他是公斤 */
+  amount: number;
 }
 
 export interface FertilizingRecord {
   id: ID;
   orchardId: ID;
   datetime: string;
+  waterLiters: number; // 水使用總量（公升）
   items: FertItem[];
   targets: string[];
   otherTarget: string;
@@ -281,6 +315,7 @@ export interface DB {
   workers: Worker[];
   suppliers: Supplier[];
   materials: Material[];
+  stock: StockTxn[];
   bagging: BaggingRecord[];
   harvests: HarvestRecord[];
   fertilizing: FertilizingRecord[];

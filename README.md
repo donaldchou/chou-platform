@@ -70,7 +70,8 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 | `spraying` | Spraying | 噴藥：用水量、藥品（陣列順序＝加入順序）、對象、AI 建議 |
 | `labor` | Labor | 剪枝／砍草（`kind`: pruning / weeding）：外請工人日薪、進場紀錄、工資結算 |
 | `suppliers` | Supplier | 貨源店家：店家電話、聯絡人與電話（最多 3 組）、地址、名片（多張） |
-| `materials` | Material | 農藥／肥料／包材（`category`），含歷史價格、多張照片；`targets` 是「成分說明」 |
+| `materials` | Material | 農藥／肥料／包材（`category`），含歷史價格、多張照片；`targets` 是「成分說明」；`minStock` 安全存量（瓶／包）；包材的 `bagType` 對應套袋紙袋類型 |
+| `stock` | Stock | 庫存異動：進貨（`purchase`，含金額、有效期限、批號）、盤點（`count`，`qty`＝實際總量）、報廢（`scrap`）；數量用基本單位 cc／g／片 |
 | `workers` | Worker | 外請工人 |
 | `employees` | Employee | 自己員工 |
 | `tasks` | Task | 工作指派與回報 |
@@ -89,7 +90,7 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 | PUT | `/api/<集合>/<id>` | 整筆儲存，不存在時建立 |
 | DELETE | `/api/<集合>/<id>` | 刪除，回 204 |
 
-可篩選欄位：bills（orchardId, kind）、materials（category, supplierId）、labor（orchardId, kind）、tasks（employeeId, orchardId, status）、salaries／bonuses（employeeId），其他紀錄（orchardId）。`from`／`to` 依各集合的主要日期欄位篩選。
+可篩選欄位：bills（orchardId, kind）、materials（category, supplierId）、stock（materialId, category, kind）、labor（orchardId, kind）、tasks（employeeId, orchardId, status）、salaries／bonuses（employeeId），其他紀錄（orchardId）。`from`／`to` 依各集合的主要日期欄位篩選。
 
 ### 商業規則
 
@@ -97,7 +98,8 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 - **關聯檢查**：紀錄的 `orchardId`、薪水／分紅／工作的 `employeeId` 必須存在。
 - **資材價格歷史**：價格變動時，後端自動把舊價格加進 `priceHistory`，並更新「資訊異動時間」。
 - **刪除果園**：底下還有紀錄時回 409 和各類紀錄筆數；帶 `?cascade=true` 才會一併刪除。
-- **驗證碼**：新增／編輯／刪除果園（`ORCHARD_CODE`；只改水塔管線照片不需要）、貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`）、噴藥紀錄（`SPRAYING_CODE`）與施肥紀錄（`FERTILIZING_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
+- **庫存**：目前庫存不存在資料庫，由前端 `src/lib/stock.ts` 依時間順序計算：進貨＋、報廢−、盤點直接設定成實際數量，噴藥（`amount`）、施肥（包數 × 每包容量）、套袋（箱數 × 每箱袋數，結餘袋數加回）自動扣除。每項資材從第一次盤點／進貨開始計算，之前的用量不扣；未來時間的紀錄不扣。`stock` 的 `category` 由後端依資材設定；只改 `minStock` 不更新資材的異動時間；刪除資材會一併刪除它的庫存異動。
+- **驗證碼**：新增／編輯／刪除果園（`ORCHARD_CODE`；只改水塔管線照片不需要）、貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`；庫存異動依資材類別使用同一組驗證碼）、噴藥紀錄（`SPRAYING_CODE`）與施肥紀錄（`FERTILIZING_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
 - **照片**：瀏覽器先壓縮成 JPEG（最長邊 1600px），上傳到 Vercel Blob 的 `chou-platform/<folder>/`，MongoDB 只存檔案網址（base64 會被拒絕）。編輯時移除的照片、刪除資料（含果園連帶刪除的紀錄）時的照片，會自動從 Blob 刪除。
 
 ### 其他

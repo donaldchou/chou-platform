@@ -20,7 +20,7 @@ export type Tone = "pest" | "fert";
  * 一筆噴藥紀錄可能兩種都算。
  */
 export function tonesOf(r: Rec, category: (materialId: string) => string | undefined): Tone[] {
-  if (!("waterLiters" in r)) return ["fert"];
+  if (!("stage" in r)) return ["fert"];
   const cats = r.items.map((i) => category(i.materialId));
   const pest = cats.includes("pesticide");
   const fert = cats.includes("fertilizer");
@@ -244,8 +244,8 @@ export function SprayCalendar({
 }
 
 export const toOpen = (r: Rec): OpenRecord =>
-  // 噴藥紀錄有 waterLiters，施肥紀錄沒有
-  "waterLiters" in r ? { kind: "spraying", record: r } : { kind: "fertilizing", record: r };
+  // 只有噴藥紀錄有 stage（施肥紀錄也有 waterLiters，不能用來判斷）
+  "stage" in r ?{ kind: "spraying", record: r } : { kind: "fertilizing", record: r };
 
 const TONE: Record<Tone, string> = {
   pest: "bg-sky-50 text-sky-800 ring-sky-200 hover:bg-sky-100",

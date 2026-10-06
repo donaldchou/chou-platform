@@ -4,12 +4,12 @@ import { useState } from "react";
 import { AlertTriangle, Plus, Printer, Share2 } from "lucide-react";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
-import { targetsText } from "@/components/record-parts";
+import { targetsText, targetsTextEn } from "@/components/record-parts";
 import { Button, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } from "@/components/ui";
 import { STAGES } from "@/lib/spray-advice";
 import { useDB } from "@/lib/store";
 import type { SprayingRecord } from "@/lib/types";
-import { defaultOrchard, fmtDT, materialCost, materialName, money, nowStr, orchardLabel, uid } from "@/lib/utils";
+import { cardPhotoOf, defaultOrchard, fmtDT, materialCost, money, nowStr, uid } from "@/lib/utils";
 
 export default function SprayingPage() {
   const db = useDB();
@@ -105,27 +105,30 @@ function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose
       <PrintArea className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
         <div>
           <div className="text-xs text-stone-500">噴藥工作單</div>
-          <div className="text-xl font-bold">{orchardLabel(o)}</div>
+          {/* 果園、藥品名稱：中文一行、英文一行（給外籍員工看） */}
+          <div className="text-xl font-bold">{o?.nameZh ?? "（已刪除的果園）"}</div>
+          {o?.nameEn && <div className="text-base font-semibold text-stone-600">{o.nameEn}</div>}
           <div className="text-sm text-stone-600">施用時間：{fmtDT(r.datetime)}</div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <div><b>對象：</b>{targetsText(r.targets, r.otherTarget) || "—"}</div>
+          <div><b>對象 Target：</b>{targetsTextEn(r.targets, r.otherTarget)}</div>
           <div><b>生長期：</b>{r.stage || "—"}</div>
           <div className="col-span-2 rounded-lg bg-sky-50 p-2 text-base"><b>用水量：</b>{r.waterLiters} 公升</div>
         </div>
         <div>
           <div className="mb-1 text-sm font-semibold">依序加入</div>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {r.items.map((it, n) => {
               const m = db.materials.find((x) => x.id === it.materialId);
               return (
-                <div key={it.id} className="flex gap-3 rounded-lg bg-stone-50 p-3">
+                <div key={it.id} className="flex items-center gap-3 rounded-lg bg-stone-50 p-1.5">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">
                     {n + 1}
                   </span>
-                  <Thumb src={m?.photos?.[0]} photos={m?.photos} showCount className="h-16 w-16" />
+                  <Thumb src={cardPhotoOf(m)} photos={m?.photos} showCount className="h-28 w-28" />
                   <div className="text-sm">
-                    <div className="font-semibold">{materialName(m)}</div>
+                    <div className="font-semibold">{m?.nameZh ?? "（已刪除）"}</div>
+                    {m?.nameEn && <div className="font-medium text-stone-600">{m.nameEn}</div>}
                     <div>用量 <b>{it.amount} {it.unit}</b>{Number(m?.dilution) > 0 && `（${m!.dilution} 倍）`}</div>
                     {m?.bannedPeriod && (
                       <div className="flex items-center gap-1 font-semibold text-red-600">
@@ -139,9 +142,10 @@ function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose
             {!r.items.length && <p className="text-sm text-stone-400">尚未加入藥品</p>}
           </div>
         </div>
-        {r.note && <div className="text-sm"><b>注意事項：</b>{r.note}</div>}
+        {/* 保留輸入時的換行 */}
+        {r.note && <div className="whitespace-pre-line text-sm text-red-600"><b>注意事項 Notes：</b>{"\n"}{r.note}</div>}
         <div className="text-sm">
-          <b>負責員工：</b>
+          <b>負責員工 Staff：</b>
           {r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}
         </div>
       </PrintArea>

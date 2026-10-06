@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { Attendance, BentoMode, BoxUsage, Orchard } from "@/lib/types";
-import { FRUITS } from "@/lib/types";
+import { FRUIT_EN, FRUITS, type Fruit } from "@/lib/types";
 import { BAG_TYPES, BENTO_PRICE, bagsPerBox, hoursBetween, todayStr, uid } from "@/lib/utils";
 import { Button, ChipSelect, Field, Input, NumInput, SearchSelect, Select } from "./ui";
 
@@ -69,6 +69,10 @@ export function TargetPicker({
 
 export const targetsText = (targets: string[], other: string) =>
   [...targets, ...(other ? [other] : [])].join("、") || "—";
+
+/** 對象中英文：甜柿 Persimmon、甜桃 Nectarine；手動填的其它果樹照原樣 */
+export const targetsTextEn = (targets: string[], other: string) =>
+  [...targets.map((t) => (t in FRUIT_EN ? `${t} ${FRUIT_EN[t as Fruit]}` : t)), ...(other ? [other] : [])].join("、") || "—";
 
 export function EditorRows({
   title,

@@ -4,8 +4,8 @@ import { useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Sparkles } from "lucide-react";
 import { fetchSprayAdvice, upsert, useDB } from "@/lib/store";
 import { STAGES } from "@/lib/spray-advice";
-import type { SprayingRecord } from "@/lib/types";
-import { materialCost, materialName, money, uid } from "@/lib/utils";
+import type { Material, SprayingRecord } from "@/lib/types";
+import { fmtDT, materialCost, materialName, money, orchardLabel, uid } from "@/lib/utils";
 import {
   DelBtn,
   EditorRows,
@@ -15,7 +15,18 @@ import {
   TargetPicker,
   targetsText,
 } from "./record-parts";
-import { Button, Field, Input, Modal, NumInput, SectionTitle, Select, Textarea } from "./ui";
+import {
+  Button,
+  Field,
+  Input,
+  Modal,
+  NumInput,
+  SearchSelect,
+  SectionTitle,
+  Select,
+  Textarea,
+  type SearchOption,
+} from "./ui";
 
 /** 新增／編輯噴藥紀錄（噴藥紀錄頁與日曆共用）；code 是打開前已驗證過的驗證碼，儲存時送給後端 */
 export function SprayModal({ record, code, onClose }: { record: SprayingRecord; code?: string; onClose: () => void }) {
@@ -26,6 +37,39 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
   const pesticides = db.materials.filter((m) => m.category === "pesticide");
   const ferts = db.materials.filter((m) => m.category === "fertilizer");
   const mat = (id: string) => db.materials.find((m) => m.id === id);
+  // 搜尋時也比對廠商與成分說明
+  const toOption = (group: string) => (m: Material): SearchOption => ({
+    value: m.id,
+    label: materialName(m),
+    group,
+    keywords: `${m.manufacturer ?? ""} ${m.targets}`,
+  });
+  const materialOptions = [...pesticides.map(toOption("農藥")), ...ferts.map(toOption("肥料"))];
+
+  // 參考過去的噴藥紀錄：選果園＋日期後，把配方等內容帶入目前表單（不會存進資料庫）
+  const [refOrchard, setRefOrchard] = useState(record.orchardId || db.orchards[0]?.id || "");
+  const [refId, setRefId] = useState("");
+  const [refYear, setRefYear] = useState(""); // YYYY，空白＝全部
+  const orchardRecords = db.spraying.filter((x) => x.orchardId === refOrchard && x.id !== record.id);
+  const refYears = [...new Set(orchardRecords.map((x) => x.datetime.slice(0, 4)).filter(Boolean))].sort().reverse();
+  const refRecords = orchardRecords
+    .filter((x) => x.datetime.startsWith(refYear))
+    .sort((a, b) => b.datetime.localeCompare(a.datetime));
+
+  function applyRef() {
+    const src = refRecords.find((x) => x.id === refId);
+    if (!src) return;
+    if (r.items.length && !window.confirm("要用參考紀錄的內容取代目前已填的配方嗎？")) return;
+    setR((p) => ({
+      ...p,
+      waterLiters: src.waterLiters,
+      items: src.items.map((i) => ({ ...i, id: uid() })),
+      targets: [...src.targets],
+      otherTarget: src.otherTarget,
+      employeeIds: [...src.employeeIds],
+      stage: src.stage,
+    }));
+  }
   const total = r.items.reduce((s, i) => s + materialCost(mat(i.materialId), i.amount), 0);
 
   function move(i: number, d: -1 | 1) {
@@ -68,6 +112,36 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
         </>
       }
     >
+      <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50/60 p-4">
+        <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1.5fr_auto]">
+          <Field label="參考果園">
+            <Select value={refOrchard} onChange={(e) => { setRefOrchard(e.target.value); setRefYear(""); setRefId(""); }}>
+              {db.orchards.map((o) => <option key={o.id} value={o.id}>{orchardLabel(o)}</option>)}
+            </Select>
+          </Field>
+          <Field label="年份">
+            <Select value={refYear} onChange={(e) => { setRefYear(e.target.value); setRefId(""); }}>
+              <option value="">全部</option>
+              {refYears.map((y) => <option key={y} value={y}>{y} 年</option>)}
+            </Select>
+          </Field>
+          <Field label="參考日期">
+            <Select value={refId} onChange={(e) => setRefId(e.target.value)} disabled={!refRecords.length}>
+              <option value="">
+                {refRecords.length ? "請選擇要參考的噴藥紀錄" : refYear ? "這個年份沒有噴藥紀錄" : "此果園尚無噴藥紀錄"}
+              </option>
+              {refRecords.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {fmtDT(x.datetime)}・{x.items.map((i) => mat(i.materialId)?.nameZh ?? "（已刪除）").join("、") || "無藥品"}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button variant="secondary" onClick={applyRef} disabled={!refId}>帶入</Button>
+        </div>
+        <p className="mt-2 text-xs text-stone-500">帶入水量、配方、對象、人員與時間點，帶入後可再手動調整；果園與日期不會被覆蓋。</p>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <OrchardSelect value={r.orchardId} onChange={(v) => set("orchardId", v)} />
         <Field label="施用日期時間">
@@ -106,20 +180,14 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
                   </div>
                 </div>
                 <Field label="藥品／肥料品牌">
-                  <Select
+                  <SearchSelect
                     value={it.materialId}
-                    onChange={(e) => {
-                      const nm = mat(e.target.value);
-                      upd({ materialId: e.target.value, unit: nm?.unit === "ml" ? "cc" : "g" });
+                    options={materialOptions}
+                    onChange={(id) => {
+                      const nm = mat(id);
+                      upd({ materialId: id, unit: nm?.unit === "ml" ? "cc" : "g" });
                     }}
-                  >
-                    <optgroup label="農藥">
-                      {pesticides.map((p) => <option key={p.id} value={p.id}>{materialName(p)}</option>)}
-                    </optgroup>
-                    <optgroup label="肥料">
-                      {ferts.map((p) => <option key={p.id} value={p.id}>{materialName(p)}</option>)}
-                    </optgroup>
-                  </Select>
+                  />
                 </Field>
                 <Field label="使用量">
                   <NumInput value={it.amount} onChange={(v) => upd({ amount: v })} />

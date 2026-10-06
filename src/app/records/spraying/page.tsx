@@ -5,7 +5,7 @@ import { AlertTriangle, Plus, Printer, Share2 } from "lucide-react";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
 import { targetsText } from "@/components/record-parts";
-import { Button, Modal, PageHeader, RowActions, Table, Td, Thumb } from "@/components/ui";
+import { Button, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } from "@/components/ui";
 import { STAGES } from "@/lib/spray-advice";
 import { useDB } from "@/lib/store";
 import type { SprayingRecord } from "@/lib/types";
@@ -102,7 +102,7 @@ function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose
         </>
       }
     >
-      <div className="print-area space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
+      <PrintArea className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
         <div>
           <div className="text-xs text-stone-500">噴藥工作單</div>
           <div className="text-xl font-bold">{orchardLabel(o)}</div>
@@ -144,7 +144,7 @@ function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose
           <b>負責員工：</b>
           {r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}
         </div>
-      </div>
+      </PrintArea>
       <p className="mt-3 text-xs text-stone-500">可列印或存成 PDF 後透過 LINE 傳給員工。</p>
     </Modal>
   );

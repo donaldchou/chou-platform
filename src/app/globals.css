@@ -21,18 +21,18 @@ body {
   font-family: var(--font-sans);
 }
 
-/* 員工參考卡列印：只印出 .print-area */
+/* 員工參考卡列印：只印出 <PrintArea> 放在 body 底下的副本 */
+.print-portal {
+  display: none;
+}
 @media print {
-  body * {
-    visibility: hidden;
+  body {
+    overflow: visible !important;
   }
-  .print-area,
-  .print-area * {
-    visibility: visible;
+  body > *:not(.print-portal) {
+    display: none !important;
   }
-  .print-area {
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
+  .print-portal {
+    display: block;
   }
 }

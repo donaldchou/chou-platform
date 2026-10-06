@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ImagePlus, Pencil, Trash2, X } from "lucide-react";
 import { Lightbox } from "./lightbox";
 import { useCanEdit } from "@/lib/store";
@@ -144,6 +145,132 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`${inputCls} ${props.className ?? ""}`} />;
 }
 
+/**
+ * 要列印的區塊（例如員工參考卡）。畫面上照常顯示；另外在 body 底下放一份副本，
+ * 列印時只印這份副本——如果直接印 Modal 裡的內容，fixed 定位會讓它在每一頁重複出現。
+ */
+export function PrintArea({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <>
+      <div className={className}>{children}</div>
+      {typeof document !== "undefined" &&
+        createPortal(<div className={`print-portal ${className}`}>{children}</div>, document.body)}
+    </>
+  );
+}
+
+export type SearchOption = { value: string; label: string; group?: string; keywords?: string };
+
+/**
+ * 可以打字搜尋的下拉選單：點開後輸入關鍵字（空白分隔可多個）即時篩選，
+ * 方向鍵上下移動、Enter 選取、Esc 取消。
+ */
+export function SearchSelect({
+  value,
+  options,
+  onChange,
+  placeholder = "輸入關鍵字搜尋…",
+}: {
+  value: string;
+  options: SearchOption[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  const current = options.find((o) => o.value === value);
+
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = options.filter((o) => {
+    const text = `${o.label} ${o.keywords ?? ""} ${o.group ?? ""}`.toLowerCase();
+    return terms.every((t) => text.includes(t));
+  });
+
+  useEffect(() => {
+    listRef.current?.querySelector(`[data-i="${active}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [active]);
+
+  function pick(o?: SearchOption) {
+    if (o) onChange(o.value);
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <div className="relative">
+      <input
+        className={inputCls}
+        value={open ? query : current?.label ?? ""}
+        placeholder={open ? current?.label || placeholder : placeholder}
+        onFocus={(e) => {
+          setOpen(true);
+          setQuery("");
+          setActive(Math.max(0, options.findIndex((o) => o.value === value)));
+          e.target.select();
+        }}
+        onBlur={() => pick()}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setActive(0);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActive((a) => Math.min(a + 1, shown.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive((a) => Math.max(a - 1, 0));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            pick(shown[active]);
+            e.currentTarget.blur();
+          } else if (e.key === "Escape" && open) {
+            // 只關閉選單，不要連帶關掉外層的 Modal（Modal 會略過 defaultPrevented 的 Esc）
+            e.preventDefault();
+            e.stopPropagation();
+            pick();
+            e.currentTarget.blur();
+          }
+        }}
+      />
+      {open && (
+        <div
+          ref={listRef}
+          className="absolute z-20 mt-1 max-h-64 w-full min-w-56 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
+        >
+          {shown.length === 0 && <p className="px-3 py-2 text-sm text-stone-400">找不到符合的項目</p>}
+          {shown.map((o, i) => (
+            <div key={o.value}>
+              {o.group && o.group !== shown[i - 1]?.group && (
+                <div className="px-3 pb-1 pt-2 text-xs font-semibold text-stone-400">{o.group}</div>
+              )}
+              <button
+                type="button"
+                data-i={i}
+                // 用 mousedown 選取，避免 input 先 blur 把選單關掉
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(o);
+                  (document.activeElement as HTMLElement | null)?.blur();
+                }}
+                onMouseEnter={() => setActive(i)}
+                className={`block w-full px-3 py-1.5 text-left text-sm ${
+                  i === active ? "bg-emerald-50 text-emerald-800" : "text-stone-700"
+                } ${o.value === value ? "font-semibold" : ""}`}
+              >
+                {o.label}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea rows={3} {...props} className={`${inputCls} ${props.className ?? ""}`} />;
 }
@@ -184,7 +311,8 @@ export function Modal({
 }) {
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // React 的事件也掛在 document 上，stopPropagation 擋不住這裡；子元件已處理的 Esc 會先 preventDefault
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && onClose();
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {

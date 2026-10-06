@@ -9,7 +9,7 @@ import { useFertCost } from "@/components/fert-modal";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
 import { targetsText } from "@/components/record-parts";
-import { Button, Gallery, Modal, PageHeader, RowActions, Table, Td, Thumb } from "@/components/ui";
+import { Button, Gallery, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } from "@/components/ui";
 
 export default function FertilizingPage() {
   const db = useDB();
@@ -96,7 +96,7 @@ function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onCl
         </>
       }
     >
-      <div className="print-area space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
+      <PrintArea className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
         <div>
           <div className="text-xs text-stone-500">施肥工作單</div>
           <div className="text-xl font-bold">{orchardLabel(o)}</div>
@@ -130,7 +130,7 @@ function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onCl
             <Gallery photos={r.photos} size="h-28 w-28" />
           </div>
         )}
-      </div>
+      </PrintArea>
       <p className="mt-3 text-xs text-stone-500">可列印或存成 PDF 後透過 LINE 傳給員工。</p>
     </Modal>
   );

@@ -140,9 +140,30 @@ const LaborSchema = new Schema({
   },
 });
 
+/** 種苗／嫁接／環剝紀錄（kind 區分） */
+const PropagationSchema = new Schema({
+  _id: idField,
+  kind: { type: String, enum: ["planting", "grafting", "girdling"], required: true, index: true },
+  orchardId: orchardRef,
+  date: ymd,
+  fruit: str,
+  variety: str, // 種植／接穗品種
+  rootstock: str, // 嫁接：砧木
+  seedlingSource: str, // 種植：苗木來源
+  location: str, // 區塊／位置
+  count: money, // 株數
+  survived: money, // 成活株數
+  checkDate: ymd, // 成活檢查日期
+  girdleWidth: money, // 環剝寬度（cm）
+  employeeIds: ids,
+  photos,
+  note: str,
+});
+
 export const BillModel = defineModel("Bill", BillSchema, "bills");
 export const BaggingModel = defineModel("Bagging", BaggingSchema, "bagging");
 export const HarvestModel = defineModel("Harvest", HarvestSchema, "harvests");
 export const FertilizingModel = defineModel("Fertilizing", FertilizingSchema, "fertilizing");
 export const SprayingModel = defineModel("Spraying", SprayingSchema, "spraying");
 export const LaborModel = defineModel("Labor", LaborSchema, "labor");
+export const PropagationModel = defineModel("Propagation", PropagationSchema, "propagation");

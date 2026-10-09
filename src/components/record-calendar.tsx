@@ -91,7 +91,9 @@ export function RecordsToolbar({
   view,
   setView,
   count,
-}: ReturnType<typeof useRecordsFilter> & { count: string }) {
+}: Pick<ReturnType<typeof useRecordsFilter>, "years" | "year" | "setYear" | "minYear" | "maxYear" | "view" | "setView"> & {
+  count: string;
+}) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-1.5 text-sm text-stone-600">

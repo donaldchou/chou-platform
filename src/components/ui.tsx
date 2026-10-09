@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ImagePlus, Pencil, Trash2, X } from "lucide-react";
+import { ChevronDown, ImagePlus, Pencil, Trash2, X } from "lucide-react";
 import { Lightbox } from "./lightbox";
 import { useCanEdit } from "@/lib/store";
 import { photoSrc, uploadPhoto } from "@/lib/utils";
@@ -265,6 +265,89 @@ export function SearchSelect({
                 {o.label}
               </button>
             </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 可自由輸入、也可從清單挑選的欄位（取代瀏覽器原生 datalist：
+ * 原生的會跟著系統變成深色，而且欄位有值時只列出符合的項目，看起來像選單沒出現）。
+ * 點開時一律列出全部選項，開始打字才篩選。
+ */
+export function ComboInput({
+  value,
+  options,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState(false);
+  const shown = typed && value ? options.filter((o) => o.includes(value)) : options;
+
+  return (
+    <div className="relative">
+      <input
+        className={`${inputCls} pr-9`}
+        value={value}
+        placeholder={placeholder}
+        onFocus={() => {
+          setOpen(true);
+          setTyped(false);
+        }}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setTyped(true);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && open) {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+          }
+        }}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="展開選項"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+          if (open) setOpen(false);
+          else input.focus();
+        }}
+        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-stone-400 hover:text-stone-600"
+      >
+        <ChevronDown size={16} />
+      </button>
+      {open && shown.length > 0 && (
+        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
+          {shown.map((o) => (
+            <button
+              key={o}
+              type="button"
+              // 用 mousedown 選取，避免 input 先 blur 把選單關掉
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(o);
+                setOpen(false);
+              }}
+              className={`block w-full px-3 py-1.5 text-left text-sm text-stone-700 hover:bg-emerald-50 hover:text-emerald-800 ${
+                o === value ? "font-semibold text-emerald-800" : ""
+              }`}
+            >
+              {o}
+            </button>
           ))}
         </div>
       )}

@@ -6,7 +6,8 @@ import type { DB } from "./types";
 // 前端資料快取：啟動時從 /api/db 載入，寫入時先更新畫面（樂觀更新）再送到後端。
 const EMPTY: DB = {
   orchards: [], bills: [], employees: [], workers: [], suppliers: [], materials: [], stock: [], bagging: [],
-  harvests: [], fertilizing: [], spraying: [], labor: [], tasks: [], salaries: [], bonuses: [],
+  harvests: [], fertilizing: [], spraying: [], labor: [], propagation: [], tasks: [], salaries: [], bonuses: [],
+  knowledge: [],
 };
 
 type Status = "idle" | "loading" | "ready" | "error";

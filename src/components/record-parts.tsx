@@ -5,7 +5,7 @@ import { useDB } from "@/lib/store";
 import type { Attendance, BentoMode, BoxUsage, Orchard } from "@/lib/types";
 import { FRUIT_EN, FRUITS, type Fruit } from "@/lib/types";
 import { BAG_TYPES, BENTO_PRICE, bagsPerBox, hoursBetween, todayStr, uid } from "@/lib/utils";
-import { Button, ChipSelect, Field, Input, NumInput, SearchSelect, Select } from "./ui";
+import { Button, ChipSelect, ComboInput, Field, Input, NumInput, SearchSelect, Select } from "./ui";
 
 /** 果園選單：可打字搜尋中文或英文名稱；使用中的果園排前面，已關閉的另成一群 */
 export function OrchardSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -70,7 +70,7 @@ export function TargetPicker({
 export const targetsText = (targets: string[], other: string) =>
   [...targets, ...(other ? [other] : [])].join("、") || "—";
 
-/** 對象中英文：甜柿 Persimmon、甜桃 Nectarine；手動填的其它果樹照原樣 */
+/** 對象中英文：甜柿 Persimmon、五月桃 May Peach；手動填的其它果樹照原樣 */
 export const targetsTextEn = (targets: string[], other: string) =>
   [...targets.map((t) => (t in FRUIT_EN ? `${t} ${FRUIT_EN[t as Fruit]}` : t)), ...(other ? [other] : [])].join("、") || "—";
 
@@ -130,7 +130,7 @@ export function AttendanceEditor({
       {rows.map((r) => (
         <div key={r.id} className="grid grid-cols-2 items-end gap-2 rounded-lg bg-white p-2 sm:grid-cols-[1fr_1.3fr_1.3fr_auto_auto]">
           <Field label="姓名">
-            <Input list="attendance-names" value={r.name} onChange={(e) => upd(r.id, { name: e.target.value })} />
+            <ComboInput value={r.name} options={names} onChange={(v) => upd(r.id, { name: v })} />
           </Field>
           <Field label="進場時間">
             <Input type="datetime-local" value={r.in} onChange={(e) => upd(r.id, { in: e.target.value })} />
@@ -142,11 +142,6 @@ export function AttendanceEditor({
           <DelBtn onClick={() => onChange(rows.filter((x) => x.id !== r.id))} />
         </div>
       ))}
-      <datalist id="attendance-names">
-        {names.map((n) => (
-          <option key={n} value={n} />
-        ))}
-      </datalist>
     </EditorRows>
   );
 }

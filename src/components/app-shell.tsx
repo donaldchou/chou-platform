@@ -6,6 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import {
   Axe,
   Apple,
+  BookOpen,
   Boxes,
   ChevronsLeft,
   ChevronsRight,
@@ -20,6 +21,7 @@ import {
   Scissors,
   ShieldCheck,
   ShoppingBasket,
+  Shovel,
   SprayCan,
   Sprout,
   Store,
@@ -49,6 +51,7 @@ const NAV = [
       { href: "/records/spraying", label: "噴藥紀錄", icon: SprayCan },
       { href: "/records/pruning", label: "剪枝紀錄", icon: Scissors },
       { href: "/records/weeding", label: "砍草紀錄", icon: Axe },
+      { href: "/records/propagation", label: "種苗/嫁接/環剝", icon: Shovel },
     ],
   },
   {
@@ -66,6 +69,7 @@ const NAV = [
     items: [
       { href: "/staff", label: "員工工作回報", icon: ClipboardList },
       { href: "/workers", label: "外請工人", icon: Users },
+      { href: "/knowledge", label: "知識管理", icon: BookOpen },
     ],
   },
 ];

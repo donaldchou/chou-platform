@@ -181,7 +181,7 @@ function TaskModal({ task, onClose }: { task: Task; onClose: () => void }) {
           <Input type="date" value={t.dueDate} onChange={(e) => setT({ ...t, dueDate: e.target.value })} />
         </Field>
         <Field label="工作內容" className="sm:col-span-2">
-          <Input value={t.title} onChange={(e) => setT({ ...t, title: e.target.value })} placeholder="例：東區甜桃噴殺蟲劑" />
+          <Input value={t.title} onChange={(e) => setT({ ...t, title: e.target.value })} placeholder="例：東區五月桃噴殺蟲劑" />
         </Field>
         <Field label="狀態">
           <Select value={t.status} onChange={(e) => setT({ ...t, status: e.target.value as TaskStatus })}>

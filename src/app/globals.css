@@ -8,6 +8,8 @@
 /* 放大整體字級（Tailwind 的尺寸都以 rem 計算，會一起等比例放大） */
 html {
   font-size: 17px;
+  /* 一律用明亮風格：日期選擇器、下拉選單等瀏覽器原生元件不跟著系統深色模式變黑 */
+  color-scheme: light;
 }
 @media (min-width: 1024px) {
   html {

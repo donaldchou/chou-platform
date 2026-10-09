@@ -1,11 +1,11 @@
 export type ID = string;
 
-export const FRUITS = ["甜桃", "水蜜桃", "李子", "甜柿"] as const;
+export const FRUITS = ["五月桃", "水蜜桃", "李子", "甜柿"] as const;
 export type Fruit = (typeof FRUITS)[number];
 
 /** 果樹英文名稱（員工參考卡給外籍員工看） */
 export const FRUIT_EN: Record<Fruit, string> = {
-  甜桃: "Nectarine",
+  五月桃: "May Peach",
   水蜜桃: "Peach",
   李子: "Plum",
   甜柿: "Persimmon",
@@ -276,6 +276,34 @@ export interface LaborRecord {
   wages: LaborWage[];
 }
 
+/** 種苗／嫁接／環剝紀錄：planting＝種苗種植、grafting＝嫁接、girdling＝環狀剝皮 */
+export type PropagationKind = "planting" | "grafting" | "girdling";
+
+export const PROPAGATION_KINDS: Record<PropagationKind, string> = {
+  planting: "種苗種植",
+  grafting: "嫁接",
+  girdling: "環狀剝皮",
+};
+
+export interface PropagationRecord {
+  id: ID;
+  kind: PropagationKind;
+  orchardId: ID;
+  date: string; // 作業日期 YYYY-MM-DD
+  fruit: string; // 果樹
+  variety: string; // 種植／接穗品種
+  rootstock: string; // 嫁接：砧木
+  seedlingSource: string; // 種植：苗木來源
+  location: string; // 區塊／位置
+  count: number; // 株數
+  survived: number; // 種植／嫁接：成活株數（0＝尚未確認）
+  checkDate: string; // 種植／嫁接：成活檢查日期
+  girdleWidth: number; // 環剝：寬度（cm）
+  employeeIds: ID[];
+  photos: string[];
+  note: string;
+}
+
 export const TASK_STATUSES = ["待處理", "進行中", "已完成"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
@@ -308,6 +336,32 @@ export interface Bonus {
   note: string;
 }
 
+/** 知識管理：AI 問答備份、網路文章、YouTube 影片、重要資訊、管理經驗 */
+export type KnowledgeKind = "ai" | "web" | "video" | "info" | "experience";
+
+export const KNOWLEDGE_KINDS: Record<KnowledgeKind, string> = {
+  ai: "AI 問答",
+  web: "網路文章",
+  video: "YouTube 影片",
+  info: "重要資訊",
+  experience: "管理經驗",
+};
+
+export interface KnowledgeItem {
+  id: ID;
+  kind: KnowledgeKind;
+  title: string;
+  category: string; // 分類（噴藥、施肥…）
+  date: string; // 記錄日期 YYYY-MM-DD
+  source: string; // 來源：AI 名稱、網站、作者
+  sourceUrl: string; // 原文網址
+  question: string; // AI 問答：當時問的問題
+  content: string;
+  videos: string[]; // YouTube 連結
+  photos: string[];
+  pinned: boolean; // 重要，排在最前面
+}
+
 export interface DB {
   orchards: Orchard[];
   bills: Bill[];
@@ -321,7 +375,9 @@ export interface DB {
   fertilizing: FertilizingRecord[];
   spraying: SprayingRecord[];
   labor: LaborRecord[];
+  propagation: PropagationRecord[];
   tasks: Task[];
   salaries: Salary[];
   bonuses: Bonus[];
+  knowledge: KnowledgeItem[];
 }

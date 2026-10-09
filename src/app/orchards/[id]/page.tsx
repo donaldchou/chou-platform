@@ -57,6 +57,7 @@ export default function OrchardDetail() {
     { label: "噴藥", n: db.spraying.filter((r) => r.orchardId === o.id).length, href: "/records/spraying" },
     { label: "剪枝", n: db.labor.filter((r) => r.orchardId === o.id && r.kind === "pruning").length, href: "/records/pruning" },
     { label: "砍草", n: db.labor.filter((r) => r.orchardId === o.id && r.kind === "weeding").length, href: "/records/weeding" },
+    { label: "種苗／嫁接／環剝", n: db.propagation.filter((r) => r.orchardId === o.id).length, href: "/records/propagation" },
   ];
 
   return (

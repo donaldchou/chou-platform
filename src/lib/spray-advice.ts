@@ -41,7 +41,7 @@ export function advicePrompt(stage: string, targets: string, waterLiters: number
         )
         .join("\n")
     : "（尚未選擇藥品）";
-  return `你是台灣高山果園（甜桃、水蜜桃、李子、甜柿）的植物保護顧問。
+  return `你是台灣高山果園（五月桃、水蜜桃、李子、甜柿）的植物保護顧問。
 果樹目前時間點：${stage}
 噴藥對象：${targets}
 預計用水量：${waterLiters} 公升

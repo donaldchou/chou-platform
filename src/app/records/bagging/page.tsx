@@ -23,6 +23,7 @@ import {
   ChipSelect,
   Empty,
   Field,
+  ComboInput,
   Input,
   Modal,
   NumInput,
@@ -194,7 +195,7 @@ function BaggingModal({ record, onClose }: { record: BaggingRecord; onClose: () 
             return (
               <div key={w.id} className="grid grid-cols-2 items-end gap-2 rounded-lg bg-white p-2 sm:grid-cols-[1.2fr_1fr_1fr_1fr_auto]">
                 <Field label="姓名">
-                  <Input value={w.name} list="attendance-names" onChange={(e) => upd({ name: e.target.value })} />
+                  <ComboInput value={w.name} options={workerNames} onChange={(v) => upd({ name: v })} />
                 </Field>
                 <Field label="總袋數">
                   <NumInput value={w.bags} onChange={(v) => upd({ bags: v })} />

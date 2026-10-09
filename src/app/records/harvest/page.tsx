@@ -9,6 +9,7 @@ import { OrchardSelect } from "@/components/record-parts";
 import {
   Badge,
   Button,
+  ComboInput,
   Field,
   Input,
   Modal,
@@ -76,8 +77,7 @@ function HarvestModal({ record, onClose }: { record: HarvestRecord; onClose: () 
       <div className="grid gap-4 sm:grid-cols-2">
         <OrchardSelect value={r.orchardId} onChange={(v) => setR({ ...r, orchardId: v })} />
         <Field label="果樹">
-          <Input list="fruit-list" value={r.fruit} onChange={(e) => setR({ ...r, fruit: e.target.value })} />
-          <datalist id="fruit-list">{FRUITS.map((f) => <option key={f} value={f} />)}</datalist>
+          <ComboInput value={r.fruit} options={FRUITS} onChange={(v) => setR({ ...r, fruit: v })} />
         </Field>
         <Field label="開始採收時間">
           <Input type="date" value={r.start} onChange={(e) => setR({ ...r, start: e.target.value })} />

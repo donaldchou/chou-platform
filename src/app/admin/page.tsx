@@ -306,9 +306,11 @@ const COLL_LABEL: Record<Coll, string> = {
   fertilizing: "施肥紀錄",
   spraying: "噴藥紀錄",
   labor: "剪枝／砍草紀錄",
+  propagation: "種苗／嫁接／環剝紀錄",
   tasks: "工作指派",
   salaries: "薪資",
   bonuses: "分紅",
+  knowledge: "知識管理",
 };
 
 /** 列表上顯示的簡短說明：挑名稱、日期這類最好認的欄位 */

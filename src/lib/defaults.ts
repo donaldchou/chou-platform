@@ -15,7 +15,7 @@ export function emptyOrchard(): Orchard {
     parcels: [{ id: uid(), landNo: "", lat: "", lng: "", landType: "農牧", areaFen: 0 }],
     acquisition: { cost: 0, date: "", name: "", phone: "" },
     contract: { start: "", end: "", photos: [] },
-    trees: { 甜桃: 0, 水蜜桃: 0, 李子: 0, 甜柿: 0, otherName: "", other: 0 },
+    trees: { 五月桃: 0, 水蜜桃: 0, 李子: 0, 甜柿: 0, otherName: "", other: 0 },
     waterTank: { sizeTon: 0, count: 0 },
     pump: { spec: "", price: 0 },
     sprayPipe: { diameterFen: 0, pricePerRoll: 0, fittings: 0 },

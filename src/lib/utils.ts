@@ -5,7 +5,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10);
 export const BENTO_PRICE = 100;
 
 export const BAG_TYPES = [
-  { type: "甜桃", perBox: 10000 },
+  { type: "五月桃", perBox: 10000 },
   { type: "水蜜桃", perBox: 6000 },
   { type: "甜柿", perBox: 6000 },
 ];
@@ -84,7 +84,7 @@ export const orchardArea = (o: Orchard) =>
   o.parcels.reduce((s, p) => s + (p.areaFen || 0), 0);
 
 export const orchardTrees = (o: Orchard) =>
-  o.trees.甜桃 + o.trees.水蜜桃 + o.trees.李子 + o.trees.甜柿 + o.trees.other;
+  o.trees.五月桃 + o.trees.水蜜桃 + o.trees.李子 + o.trees.甜柿 + o.trees.other;
 
 export const orchardLabel = (o?: Orchard) =>
   o ? `${o.nameZh}${o.nameEn ? ` (${o.nameEn})` : ""}` : "（已刪除的果園）";

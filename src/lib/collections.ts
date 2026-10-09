@@ -9,8 +9,10 @@ import {
   FertilizingModel,
   HarvestModel,
   LaborModel,
+  PropagationModel,
   SprayingModel,
 } from "@/models/records";
+import { KnowledgeModel } from "@/models/knowledge";
 
 /** API 路徑 /api/<collection> 對應的 Mongoose model，名稱與前端 DB 的 key 相同。 */
 export const COLLECTIONS: Record<keyof DB, Model<unknown>> = {
@@ -26,9 +28,11 @@ export const COLLECTIONS: Record<keyof DB, Model<unknown>> = {
   fertilizing: FertilizingModel,
   spraying: SprayingModel,
   labor: LaborModel,
+  propagation: PropagationModel,
   tasks: TaskModel,
   salaries: SalaryModel,
   bonuses: BonusModel,
+  knowledge: KnowledgeModel,
 };
 
 export type CollectionName = keyof DB;
@@ -45,9 +49,11 @@ export const FILTERS: Partial<Record<CollectionName, string[]>> = {
   fertilizing: ["orchardId"],
   spraying: ["orchardId"],
   labor: ["orchardId", "kind"],
+  propagation: ["orchardId", "kind"],
   tasks: ["employeeId", "orchardId", "status"],
   salaries: ["employeeId"],
   bonuses: ["employeeId"],
+  knowledge: ["kind", "category"],
 };
 
 /** 刪除果園時會一併刪除的關聯紀錄 */
@@ -58,6 +64,7 @@ export const ORCHARD_CHILDREN: CollectionName[] = [
   "fertilizing",
   "spraying",
   "labor",
+  "propagation",
   "tasks",
 ];
 
@@ -70,7 +77,9 @@ export const SORT: Partial<Record<CollectionName, Record<string, 1 | -1>>> = {
   fertilizing: { datetime: -1 },
   spraying: { datetime: -1 },
   labor: { start: -1 },
+  propagation: { date: -1 },
   tasks: { dueDate: 1 },
   salaries: { month: -1 },
   bonuses: { date: -1 },
+  knowledge: { date: -1 },
 };

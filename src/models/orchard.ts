@@ -48,7 +48,7 @@ const OrchardSchema = new Schema({
     photos,
   },
   trees: {
-    甜桃: money,
+    五月桃: money,
     水蜜桃: money,
     李子: money,
     甜柿: money,

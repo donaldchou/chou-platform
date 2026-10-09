@@ -17,6 +17,7 @@ import {
 import {
   Badge,
   Button,
+  ComboInput,
   Field,
   Input,
   Modal,
@@ -191,7 +192,7 @@ function LaborModal({ record, label, onClose }: { record: LaborRecord; label: st
             return (
               <div key={w.id} className="grid grid-cols-2 items-end gap-2 rounded-lg bg-white p-2 sm:grid-cols-[1.2fr_0.8fr_1fr_0.8fr_1fr_auto]">
                 <Field label="姓名">
-                  <Input value={w.name} list="attendance-names" onChange={(e) => upd({ name: e.target.value })} />
+                  <ComboInput value={w.name} options={names} onChange={(v) => upd({ name: v })} />
                 </Field>
                 <Field label="天數">
                   <NumInput value={w.days} onChange={(v) => upd({ days: v })} />

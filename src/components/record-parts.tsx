@@ -35,7 +35,7 @@ export function EmployeePicker({ value, onChange }: { value: string[]; onChange:
         options={db.employees.map((e) => ({ value: e.id, label: `${e.name}・${e.phone}` }))}
         value={value}
         onChange={onChange}
-        empty="尚未建立員工，請到「員工工作回報 → 員工名冊」新增"
+        empty="尚未建立員工，請到「員工管理/指派 → 員工名冊」新增"
       />
     </Field>
   );

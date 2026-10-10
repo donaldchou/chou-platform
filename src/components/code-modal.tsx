@@ -14,6 +14,8 @@ interface CodeAsk {
   message: React.ReactNode;
   /** 檢查驗證碼並執行動作；成功時對話框會自動關閉 */
   submit: (code: string) => Promise<CodeResult>;
+  /** 按取消關掉時（例如把畫面上已改的值還原） */
+  onCancel?: () => void;
 }
 
 /** 需要驗證碼才能做的動作：ask(...) 跳出對話框，把 dialog 放進畫面裡 */
@@ -24,7 +26,10 @@ export function useCodeGate() {
       title={ask.title}
       confirmLabel={ask.confirmLabel}
       danger={ask.danger}
-      onClose={() => setAsk(null)}
+      onClose={() => {
+        ask.onCancel?.();
+        setAsk(null);
+      }}
       onSubmit={async (code) => {
         const res = await ask.submit(code);
         if (res.ok) setAsk(null);

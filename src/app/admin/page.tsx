@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Eye, KeyRound, Plus, Search, Trash2 } from "lucide-react";
-import { CodeModal } from "@/components/code-modal";
+import { useCodeGate } from "@/components/code-modal";
 import { UnlockPanel } from "@/components/unlock-panel";
 import {
   Badge,
@@ -15,7 +15,6 @@ import {
   Table,
   Tabs,
   Td,
-  confirmDelete,
 } from "@/components/ui";
 import { reload, useDB, useMe } from "@/lib/store";
 import type { DB } from "@/lib/types";
@@ -58,6 +57,18 @@ async function call<T>(url: string, init?: RequestInit & { code?: string }): Pro
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+type CodeResult = { ok: true } | { ok: false; error: string };
+
+/** 後台的新增、修改、刪除都要驗證碼（ADMIN_CODE）；這裡只檢查、不修改資料 */
+async function verifyAdmin(action: "create" | "update" | "delete", code: string): Promise<CodeResult> {
+  try {
+    await call("/api/verify-code", { method: "POST", body: JSON.stringify({ collection: "admin", action, code }) });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: errMsg(e) };
+  }
+}
+
 /* ---------------- 使用者管理 ---------------- */
 type User = {
   id: string;
@@ -75,32 +86,79 @@ function UsersTab() {
   const me = useMe();
   const [users, setUsers] = useState<User[] | null>(null);
   const [error, setError] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [resetting, setResetting] = useState<User | null>(null);
+  const [adding, setAdding] = useState<{ code: string } | null>(null);
+  const [resetting, setResetting] = useState<{ user: User; code: string } | null>(null);
+  // 修改名稱時取消輸入驗證碼：換 key 讓輸入框回到原本的名稱
+  const [nameKey, setNameKey] = useState(0);
+  const gate = useCodeGate();
 
   useEffect(() => {
     call<User[]>("/api/admin/users").then(setUsers, (e) => setError(errMsg(e)));
   }, []);
 
-  async function patch(u: User, body: Partial<User> & { password?: string }) {
+  async function patch(u: User, body: Partial<User> & { password?: string }, code: string): Promise<CodeResult> {
     try {
-      const saved = await call<User>(`/api/admin/users/${u.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      const saved = await call<User>(`/api/admin/users/${u.id}`, { method: "PATCH", body: JSON.stringify(body), code });
       setUsers((list) => list?.map((x) => (x.id === saved.id ? saved : x)) ?? null);
-      return true;
+      return { ok: true };
     } catch (e) {
-      alert(`修改失敗：${errMsg(e)}`);
-      return false;
+      return { ok: false, error: errMsg(e) };
     }
   }
 
-  async function del(u: User) {
-    if (!confirmDelete(`使用者 ${u.email}`)) return;
-    try {
-      await call(`/api/admin/users/${u.id}`, { method: "DELETE" });
-      setUsers((list) => list?.filter((x) => x.id !== u.id) ?? null);
-    } catch (e) {
-      alert(`刪除失敗：${errMsg(e)}`);
-    }
+  // 新增、修改、刪除都要先輸入驗證碼（後端也會再檢查）
+  function askPatch(u: User, body: Partial<User>, what: string) {
+    gate.ask({
+      title: "修改使用者",
+      confirmLabel: "確認修改",
+      message: <>修改 <b>{u.email}</b> 的{what}需要驗證碼。</>,
+      submit: (code) => patch(u, body, code),
+      onCancel: () => setNameKey((k) => k + 1),
+    });
+  }
+
+  function askAdd() {
+    gate.ask({
+      title: "新增使用者",
+      confirmLabel: "下一步",
+      message: "新增使用者需要驗證碼。",
+      submit: async (code) => {
+        const res = await verifyAdmin("create", code);
+        if (res.ok) setAdding({ code });
+        return res;
+      },
+    });
+  }
+
+  function askReset(u: User) {
+    gate.ask({
+      title: "重設密碼",
+      confirmLabel: "下一步",
+      message: <>重設 <b>{u.email}</b> 的密碼需要驗證碼。</>,
+      submit: async (code) => {
+        const res = await verifyAdmin("update", code);
+        if (res.ok) setResetting({ user: u, code });
+        return res;
+      },
+    });
+  }
+
+  function askDelete(u: User) {
+    gate.ask({
+      title: "刪除使用者",
+      confirmLabel: "確認刪除",
+      danger: true,
+      message: <>即將刪除使用者 <b>{u.email}</b>，無法復原。</>,
+      submit: async (code) => {
+        try {
+          await call(`/api/admin/users/${u.id}`, { method: "DELETE", code });
+          setUsers((list) => list?.filter((x) => x.id !== u.id) ?? null);
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errMsg(e) };
+        }
+      },
+    });
   }
 
   return (
@@ -109,7 +167,7 @@ function UsersTab() {
         <p className="text-sm text-stone-500">
           管理者可以新增、修改、刪除資料並進入後台；一般使用者登入後只能檢視。沒有註冊頁，帳號都從這裡建立。
         </p>
-        <Button onClick={() => setAdding(true)}>
+        <Button onClick={askAdd}>
           <Plus size={16} /> 新增使用者
         </Button>
       </div>
@@ -124,10 +182,11 @@ function UsersTab() {
               </Td>
               <Td>
                 <Input
+                  key={`${u.name}-${nameKey}`}
                   defaultValue={u.name}
                   placeholder="（未填）"
                   className="min-w-28"
-                  onBlur={(e) => e.target.value !== u.name && void patch(u, { name: e.target.value })}
+                  onBlur={(e) => e.target.value !== u.name && askPatch(u, { name: e.target.value }, "名稱")}
                 />
               </Td>
               <Td>
@@ -136,7 +195,7 @@ function UsersTab() {
                   disabled={self}
                   className="min-w-32"
                   title={self ? "不能變更自己的身分" : undefined}
-                  onChange={(e) => void patch(u, { role: e.target.value as User["role"] })}
+                  onChange={(e) => askPatch(u, { role: e.target.value as User["role"] }, "身分")}
                 >
                   <option value="admin">管理者</option>
                   <option value="user">一般使用者</option>
@@ -148,7 +207,7 @@ function UsersTab() {
                     type="checkbox"
                     checked={u.active}
                     disabled={self}
-                    onChange={(e) => void patch(u, { active: e.target.checked })}
+                    onChange={(e) => askPatch(u, { active: e.target.checked }, e.target.checked ? "狀態（啟用）" : "狀態（停用）")}
                     className="h-4 w-4 accent-emerald-600"
                   />
                   {u.active ? "啟用" : <span className="text-red-600">停用</span>}
@@ -157,11 +216,11 @@ function UsersTab() {
               <Td className="whitespace-nowrap text-stone-500">{fmtTime(u.lastLoginAt)}</Td>
               <Td className="whitespace-nowrap text-stone-500">{fmtTime(u.createdAt)}</Td>
               <Td className="whitespace-nowrap text-right">
-                <Button size="sm" variant="ghost" onClick={() => setResetting(u)} title="重設密碼">
+                <Button size="sm" variant="ghost" onClick={() => askReset(u)} title="重設密碼">
                   <KeyRound size={14} /> 重設密碼
                 </Button>
                 {!self && (
-                  <Button size="sm" variant="ghost" className="text-red-600" onClick={() => void del(u)} title="刪除">
+                  <Button size="sm" variant="ghost" className="text-red-600" onClick={() => askDelete(u)} title="刪除">
                     <Trash2 size={14} />
                   </Button>
                 )}
@@ -175,24 +234,27 @@ function UsersTab() {
           </tr>
         )}
       </Table>
+      {gate.dialog}
       {adding && (
         <AddUserModal
-          onClose={() => setAdding(false)}
+          code={adding.code}
+          onClose={() => setAdding(null)}
           onAdded={(u) => setUsers((list) => [...(list ?? []), u])}
         />
       )}
       {resetting && (
         <PasswordModal
-          user={resetting}
+          user={resetting.user}
           onClose={() => setResetting(null)}
-          onSave={(password) => patch(resetting, { password })}
+          onSave={(password) => patch(resetting.user, { password }, resetting.code)}
         />
       )}
     </>
   );
 }
 
-function AddUserModal({ onClose, onAdded }: { onClose: () => void; onAdded: (u: User) => void }) {
+/** code：打開前已驗證過的驗證碼，建立時送給後端 */
+function AddUserModal({ code, onClose, onAdded }: { code: string; onClose: () => void; onAdded: (u: User) => void }) {
   const [form, setForm] = useState({ email: "", name: "", password: "", role: "user" as User["role"] });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -202,7 +264,7 @@ function AddUserModal({ onClose, onAdded }: { onClose: () => void; onAdded: (u: 
     setBusy(true);
     setError("");
     try {
-      onAdded(await call<User>("/api/admin/users", { method: "POST", body: JSON.stringify(form) }));
+      onAdded(await call<User>("/api/admin/users", { method: "POST", body: JSON.stringify(form), code }));
       onClose();
     } catch (err) {
       setError(errMsg(err));
@@ -251,15 +313,25 @@ function AddUserModal({ onClose, onAdded }: { onClose: () => void; onAdded: (u: 
   );
 }
 
-function PasswordModal({ user, onClose, onSave }: { user: User; onClose: () => void; onSave: (p: string) => Promise<boolean> }) {
+function PasswordModal({
+  user,
+  onClose,
+  onSave,
+}: {
+  user: User;
+  onClose: () => void;
+  onSave: (p: string) => Promise<CodeResult>;
+}) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    if (await onSave(password)) onClose();
-    else setBusy(false);
+    const res = await onSave(password);
+    if (res.ok) return onClose();
+    alert(`修改失敗：${res.error}`);
+    setBusy(false);
   }
 
   return (
@@ -331,25 +403,21 @@ function DataTab() {
   const [coll, setColl] = useState<Coll>("orchards");
   const [q, setQ] = useState("");
   const [viewing, setViewing] = useState<Doc | null>(null);
-  const [codeFor, setCodeFor] = useState<Doc | null>(null);
+  const gate = useCodeGate();
 
   const docs = db[coll] as unknown as Doc[];
   const list = q ? docs.filter((d) => JSON.stringify(d).toLowerCase().includes(q.toLowerCase())) : docs;
 
   /**
-   * 刪除一筆：需要驗證碼的集合（貨源店家、資材、噴藥、施肥）會先跳出驗證碼對話框；
+   * 刪除一筆：一律先輸入後台驗證碼；同一個驗證碼也送給資料本身的驗證（果園、資材、噴藥…）。
    * 果園底下還有紀錄時，會再確認是否一併刪除。
    */
-  async function del(d: Doc, code?: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  async function del(d: Doc, code: string): Promise<CodeResult> {
     const url = `/api/${coll}/${encodeURIComponent(d.id)}`;
     try {
       await call(url, { method: "DELETE", code });
     } catch (e) {
       const err = e as Error & { status?: number; data?: { needsCascade?: boolean } };
-      if (err.status === 403 && code === undefined) {
-        setCodeFor(d);
-        return { ok: true };
-      }
       if (err.status === 409 && err.data?.needsCascade) {
         if (!confirm(err.message)) return { ok: true };
         try {
@@ -366,10 +434,17 @@ function DataTab() {
     return { ok: true };
   }
 
-  async function confirmAndDelete(d: Doc) {
-    if (!confirmDelete(`「${summary(d) || d.id}」`)) return;
-    const res = await del(d);
-    if (!res.ok) alert(`刪除失敗：${res.error}`);
+  function confirmAndDelete(d: Doc) {
+    gate.ask({
+      title: "刪除資料",
+      confirmLabel: "確認刪除",
+      danger: true,
+      message: <>即將刪除{COLL_LABEL[coll]}「<b>{summary(d) || d.id}</b>」，無法復原。</>,
+      submit: async (code) => {
+        const res = await verifyAdmin("delete", code);
+        return res.ok ? del(d, code) : res;
+      },
+    });
   }
 
   return (
@@ -414,7 +489,7 @@ function DataTab() {
                 <Button size="sm" variant="ghost" onClick={() => setViewing(d)} title="檢視原始資料">
                   <Eye size={14} /> 檢視
                 </Button>
-                <Button size="sm" variant="ghost" className="text-red-600" onClick={() => void confirmAndDelete(d)} title="刪除">
+                <Button size="sm" variant="ghost" className="text-red-600" onClick={() => confirmAndDelete(d)} title="刪除">
                   <Trash2 size={14} />
                 </Button>
               </Td>
@@ -437,7 +512,7 @@ function DataTab() {
           title={`${COLL_LABEL[coll]}：${summary(viewing) || viewing.id}`}
           footer={
             <>
-              <Button variant="danger" className="mr-auto" onClick={() => void confirmAndDelete(viewing)}>
+              <Button variant="danger" className="mr-auto" onClick={() => confirmAndDelete(viewing)}>
                 <Trash2 size={15} /> 刪除這筆
               </Button>
               <Button variant="secondary" onClick={() => setViewing(null)}>關閉</Button>
@@ -450,21 +525,7 @@ function DataTab() {
         </Modal>
       )}
 
-      {codeFor && (
-        <CodeModal
-          title="刪除需要驗證碼"
-          confirmLabel="確認刪除"
-          danger
-          onClose={() => setCodeFor(null)}
-          onSubmit={async (code) => {
-            const res = await del(codeFor, code);
-            if (res.ok) setCodeFor(null);
-            return res;
-          }}
-        >
-          「{summary(codeFor) || codeFor.id}」屬於需要驗證碼的資料，請輸入驗證碼才能刪除。
-        </CodeModal>
-      )}
+      {gate.dialog}
     </div>
   );
 }

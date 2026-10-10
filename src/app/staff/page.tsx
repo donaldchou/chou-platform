@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { remove, upsert, useDB } from "@/lib/store";
-import { TASK_STATUSES, type Bonus, type Employee, type Salary, type Task, type TaskStatus } from "@/lib/types";
+import { removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
+import { TASK_STATUSES, type Bonus, type DB, type Employee, type Salary, type Task, type TaskStatus } from "@/lib/types";
 import { defaultOrchard, fmtDT, money, nowStr, thisMonth, todayStr, uid } from "@/lib/utils";
+import { useCodeGate } from "@/components/code-modal";
 import {
   Badge,
   Button,
@@ -35,7 +36,7 @@ export default function StaffPage() {
   const [tab, setTab] = useState<Tab>("tasks");
   return (
     <>
-      <PageHeader title="員工工作回報" desc="指派工作、查看員工回報，並管理薪水與分紅。" />
+      <PageHeader title="員工管理/指派" desc="指派工作、查看員工回報，並管理薪水與分紅。" />
       <Tabs<Tab>
         value={tab}
         onChange={setTab}
@@ -62,6 +63,47 @@ function useNames() {
   };
 }
 
+type StaffColl = "tasks" | "salaries" | "bonuses" | "employees";
+
+/**
+ * 這一頁的新增、修改、刪除都要先輸入驗證碼（後端也會再檢查）。
+ * edit(r)：驗證通過後打開表單（資料庫裡沒有這筆就算新增），表單儲存時帶 editing.code；
+ * del(r)：在確認視窗輸入驗證碼後刪除。把 dialog 放進畫面裡。
+ */
+function useGuarded<C extends StaffColl>(coll: C, label: string, name: (r: DB[C][number]) => string) {
+  type Item = DB[C][number];
+  const db = useDB();
+  const gate = useCodeGate();
+  const [editing, setEditing] = useState<{ record: Item; code: string } | null>(null);
+  const isNew = (r: Item) => !(db[coll] as Item[]).some((x) => x.id === r.id);
+
+  function edit(r: Item) {
+    const create = isNew(r);
+    gate.ask({
+      title: `${create ? "新增" : "修改"}${label}`,
+      confirmLabel: "下一步",
+      message: create ? `新增${label}需要驗證碼。` : <>修改{label}「<b>{name(r)}</b>」需要驗證碼。</>,
+      submit: async (code) => {
+        const res = await verifyCode(coll, create ? "create" : "update", code);
+        if (res.ok) setEditing({ record: r, code });
+        return res;
+      },
+    });
+  }
+
+  function del(r: Item) {
+    gate.ask({
+      title: `刪除${label}`,
+      confirmLabel: "確認刪除",
+      danger: true,
+      message: <>即將刪除{label}「<b>{name(r)}</b>」，無法復原。</>,
+      submit: (code) => removeWithCode(coll, r.id, code),
+    });
+  }
+
+  return { edit, del, editing, close: () => setEditing(null), ask: gate.ask, dialog: gate.dialog };
+}
+
 function SaveFooter({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   return (
     <>
@@ -86,11 +128,25 @@ function EmployeeSelect({ value, onChange }: { value: string; onChange: (v: stri
 function TasksTab() {
   const db = useDB();
   const n = useNames();
+  const g = useGuarded("tasks", "工作", (t) => t.title || "（未命名工作）");
   const [filter, setFilter] = useState<TaskStatus | "all">("all");
-  const [editing, setEditing] = useState<Task | null>(null);
   const list = db.tasks
     .filter((t) => filter === "all" || t.status === filter)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+  // 快速改狀態也要驗證碼
+  function setStatus(t: Task, s: TaskStatus) {
+    g.ask({
+      title: "修改工作狀態",
+      confirmLabel: `標記為${s}`,
+      message: <>將「<b>{t.title || "（未命名工作）"}</b>」標記為{s}需要驗證碼。</>,
+      submit: async (code) => {
+        const res = await verifyCode("tasks", "update", code);
+        if (res.ok) void upsert("tasks", { ...t, status: s }, { code });
+        return res;
+      },
+    });
+  }
 
   return (
     <>
@@ -109,7 +165,7 @@ function TasksTab() {
         <EditOnly>
           <Button
             onClick={() =>
-              setEditing({
+              g.edit({
                 id: uid(), employeeId: db.employees[0]?.id ?? "", orchardId: defaultOrchard(db.orchards)?.id ?? "", category: "噴藥",
                 title: "", dueDate: todayStr(), status: "待處理", report: "", reportedAt: "",
               })
@@ -127,7 +183,7 @@ function TasksTab() {
                 <Badge tone={STATUS_TONE[t.status]}>{t.status}</Badge>
                 <Badge>{t.category}</Badge>
               </div>
-              <RowActions onEdit={() => setEditing(t)} onDelete={() => remove("tasks", t.id)} />
+              <RowActions confirm={false} onEdit={() => g.edit(t)} onDelete={() => g.del(t)} />
             </div>
             <div className="mt-2 font-semibold text-stone-900">{t.title || "（未命名工作）"}</div>
             <div className="text-sm text-stone-500">
@@ -145,7 +201,7 @@ function TasksTab() {
               <EditOnly>
                 <div className="mt-3 flex gap-2">
                   {TASK_STATUSES.filter((s) => s !== t.status).map((s) => (
-                    <Button key={s} size="sm" variant="secondary" onClick={() => upsert("tasks", { ...t, status: s })}>
+                    <Button key={s} size="sm" variant="secondary" onClick={() => setStatus(t, s)}>
                       標記為{s}
                     </Button>
                   ))}
@@ -155,16 +211,17 @@ function TasksTab() {
           </Card>
         ))}
       </div>
-      {editing && <TaskModal task={editing} onClose={() => setEditing(null)} />}
+      {g.dialog}
+      {g.editing && <TaskModal task={g.editing.record} code={g.editing.code} onClose={g.close} />}
     </>
   );
 }
 
-function TaskModal({ task, onClose }: { task: Task; onClose: () => void }) {
+function TaskModal({ task, code, onClose }: { task: Task; code: string; onClose: () => void }) {
   const db = useDB();
   const [t, setT] = useState(task);
   return (
-    <Modal open onClose={onClose} title="工作指派與回報" footer={<SaveFooter onClose={onClose} onSave={() => upsert("tasks", t)} />}>
+    <Modal open onClose={onClose} title="工作指派與回報" footer={<SaveFooter onClose={onClose} onSave={() => upsert("tasks", t, { code })} />}>
       <div className="grid gap-4 sm:grid-cols-2">
         <EmployeeSelect value={t.employeeId} onChange={(v) => setT({ ...t, employeeId: v })} />
         <Field label="果園">
@@ -204,7 +261,7 @@ function TaskModal({ task, onClose }: { task: Task; onClose: () => void }) {
 function SalaryTab() {
   const db = useDB();
   const n = useNames();
-  const [editing, setEditing] = useState<Salary | null>(null);
+  const g = useGuarded("salaries", "薪資", (s) => `${n.emp(s.employeeId)} ${s.month}`);
   const list = [...db.salaries].sort((a, b) => b.month.localeCompare(a.month));
   const month = list[0]?.month ?? thisMonth();
   const monthTotal = db.salaries.filter((s) => s.month === month).reduce((a, s) => a + s.amount, 0);
@@ -221,7 +278,7 @@ function SalaryTab() {
         <div className="mb-3 flex justify-end">
           <Button
             onClick={() =>
-              setEditing({ id: uid(), employeeId: db.employees[0]?.id ?? "", month: thisMonth(), amount: 0, photos: [], note: "" })
+              g.edit({ id: uid(), employeeId: db.employees[0]?.id ?? "", month: thisMonth(), amount: 0, photos: [], note: "" })
             }
           >
             <Plus size={16} /> 新增薪資
@@ -236,19 +293,20 @@ function SalaryTab() {
             <Td className="font-semibold">{money(s.amount)}</Td>
             <Td><Gallery photos={s.photos} size="h-10 w-10" /></Td>
             <Td className="text-stone-500">{s.note}</Td>
-            <Td><RowActions onEdit={() => setEditing(s)} onDelete={() => remove("salaries", s.id)} /></Td>
+            <Td><RowActions confirm={false} onEdit={() => g.edit(s)} onDelete={() => g.del(s)} /></Td>
           </tr>
         ))}
       </Table>
-      {editing && <SalaryModal salary={editing} onClose={() => setEditing(null)} />}
+      {g.dialog}
+      {g.editing && <SalaryModal salary={g.editing.record} code={g.editing.code} onClose={g.close} />}
     </>
   );
 }
 
-function SalaryModal({ salary, onClose }: { salary: Salary; onClose: () => void }) {
+function SalaryModal({ salary, code, onClose }: { salary: Salary; code: string; onClose: () => void }) {
   const [s, setS] = useState(salary);
   return (
-    <Modal open onClose={onClose} title="薪水管理" footer={<SaveFooter onClose={onClose} onSave={() => upsert("salaries", s)} />}>
+    <Modal open onClose={onClose} title="薪水管理" footer={<SaveFooter onClose={onClose} onSave={() => upsert("salaries", s, { code })} />}>
       <div className="grid gap-4 sm:grid-cols-2">
         <EmployeeSelect value={s.employeeId} onChange={(v) => setS({ ...s, employeeId: v })} />
         <Field label="月份">
@@ -272,7 +330,7 @@ function SalaryModal({ salary, onClose }: { salary: Salary; onClose: () => void 
 function BonusTab() {
   const db = useDB();
   const n = useNames();
-  const [editing, setEditing] = useState<Bonus | null>(null);
+  const g = useGuarded("bonuses", "分紅", (b) => `${n.emp(b.employeeId)} ${b.date}`);
   const list = [...db.bonuses].sort((a, b) => b.date.localeCompare(a.date));
   const byEmp = db.employees.map((e) => ({
     e,
@@ -288,7 +346,7 @@ function BonusTab() {
       </div>
       <EditOnly>
         <div className="mb-3 flex justify-end">
-          <Button onClick={() => setEditing({ id: uid(), employeeId: db.employees[0]?.id ?? "", date: todayStr(), amount: 0, note: "" })}>
+          <Button onClick={() => g.edit({ id: uid(), employeeId: db.employees[0]?.id ?? "", date: todayStr(), amount: 0, note: "" })}>
             <Plus size={16} /> 新增分紅
           </Button>
         </div>
@@ -300,21 +358,20 @@ function BonusTab() {
             <Td className="font-medium">{n.emp(b.employeeId)}</Td>
             <Td className="font-semibold">{money(b.amount)}</Td>
             <Td className="text-stone-500">{b.note}</Td>
-            <Td><RowActions onEdit={() => setEditing(b)} onDelete={() => remove("bonuses", b.id)} /></Td>
+            <Td><RowActions confirm={false} onEdit={() => g.edit(b)} onDelete={() => g.del(b)} /></Td>
           </tr>
         ))}
       </Table>
-      {editing && (
-        <BonusModal bonus={editing} onClose={() => setEditing(null)} />
-      )}
+      {g.dialog}
+      {g.editing && <BonusModal bonus={g.editing.record} code={g.editing.code} onClose={g.close} />}
     </>
   );
 }
 
-function BonusModal({ bonus, onClose }: { bonus: Bonus; onClose: () => void }) {
+function BonusModal({ bonus, code, onClose }: { bonus: Bonus; code: string; onClose: () => void }) {
   const [b, setB] = useState(bonus);
   return (
-    <Modal open onClose={onClose} title="分紅" footer={<SaveFooter onClose={onClose} onSave={() => upsert("bonuses", b)} />}>
+    <Modal open onClose={onClose} title="分紅" footer={<SaveFooter onClose={onClose} onSave={() => upsert("bonuses", b, { code })} />}>
       <div className="grid gap-4 sm:grid-cols-2">
         <EmployeeSelect value={b.employeeId} onChange={(v) => setB({ ...b, employeeId: v })} />
         <Field label="日期">
@@ -334,12 +391,12 @@ function BonusModal({ bonus, onClose }: { bonus: Bonus; onClose: () => void }) {
 /* ---------------- 員工名冊 ---------------- */
 function EmployeesTab() {
   const db = useDB();
-  const [editing, setEditing] = useState<Employee | null>(null);
+  const g = useGuarded("employees", "員工", (e) => e.name || "（未填姓名）");
   return (
     <>
       <EditOnly>
         <div className="mb-3 flex justify-end">
-          <Button onClick={() => setEditing({ id: uid(), name: "", phone: "", title: "正職員工" })}>
+          <Button onClick={() => g.edit({ id: uid(), name: "", phone: "", title: "正職員工" })}>
             <Plus size={16} /> 新增員工
           </Button>
         </div>
@@ -351,19 +408,20 @@ function EmployeesTab() {
             <Td><a href={`tel:${e.phone}`} className="text-emerald-700">{e.phone}</a></Td>
             <Td>{e.title}</Td>
             <Td>{db.tasks.filter((t) => t.employeeId === e.id && t.status !== "已完成").length} 件</Td>
-            <Td><RowActions onEdit={() => setEditing(e)} onDelete={() => remove("employees", e.id)} /></Td>
+            <Td><RowActions confirm={false} onEdit={() => g.edit(e)} onDelete={() => g.del(e)} /></Td>
           </tr>
         ))}
       </Table>
-      {editing && <EmployeeModal employee={editing} onClose={() => setEditing(null)} />}
+      {g.dialog}
+      {g.editing && <EmployeeModal employee={g.editing.record} code={g.editing.code} onClose={g.close} />}
     </>
   );
 }
 
-function EmployeeModal({ employee, onClose }: { employee: Employee; onClose: () => void }) {
+function EmployeeModal({ employee, code, onClose }: { employee: Employee; code: string; onClose: () => void }) {
   const [e, setE] = useState(employee);
   return (
-    <Modal open onClose={onClose} title="員工資料" footer={<SaveFooter onClose={onClose} onSave={() => upsert("employees", e)} />}>
+    <Modal open onClose={onClose} title="員工資料" footer={<SaveFooter onClose={onClose} onSave={() => upsert("employees", e, { code })} />}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="姓名">
           <Input value={e.name} onChange={(ev) => setE({ ...e, name: ev.target.value })} />

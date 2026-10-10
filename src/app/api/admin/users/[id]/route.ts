@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { HttpError, handleError, readJson } from "@/lib/api";
 import { assertPassword, hashPassword, publicUser, requireAdmin } from "@/lib/auth";
+import { assertCode, readCode } from "@/lib/codes";
 import { USER_ROLES, UserModel } from "@/models/user";
+
+/** 新增、修改、刪除使用者都需要後台驗證碼（ADMIN_CODE，header x-verify-code 或後台解鎖期間） */
 
 type Ctx = RouteContext<"/api/admin/users/[id]">;
 
@@ -14,6 +17,7 @@ function assertNotSelf(adminId: string, id: string, what: string) {
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   try {
     const admin = await requireAdmin();
+    assertCode("admin", "update", await readCode(req.headers, admin.id));
     const { id } = await ctx.params;
     const body = await readJson(req);
     const user = await UserModel.findById(id);
@@ -43,9 +47,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 }
 
 /** DELETE /api/admin/users/<id> */
-export async function DELETE(_req: NextRequest, ctx: Ctx) {
+export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
     const admin = await requireAdmin();
+    assertCode("admin", "delete", await readCode(req.headers, admin.id));
     const { id } = await ctx.params;
     assertNotSelf(admin.id, id, "刪除");
     const res = await UserModel.deleteOne({ _id: id });

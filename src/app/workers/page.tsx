@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { MessageCircle, Phone, Plus, UserRound } from "lucide-react";
-import { remove, upsert, useDB } from "@/lib/store";
+import { removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
+import { useCodeGate } from "@/components/code-modal";
 import type { Worker } from "@/lib/types";
 import { money, todayStr, uid } from "@/lib/utils";
 import {
@@ -21,7 +22,33 @@ import {
 
 export default function WorkersPage() {
   const db = useDB();
-  const [editing, setEditing] = useState<Worker | null>(null);
+  const [editing, setEditing] = useState<{ worker: Worker; code: string } | null>(null);
+  const gate = useCodeGate();
+
+  // 新增、修改、刪除都要先輸入驗證碼（後端也會再檢查）
+  function edit(w: Worker) {
+    const isNew = !db.workers.some((x) => x.id === w.id);
+    gate.ask({
+      title: isNew ? "新增外請工人" : "修改外請工人",
+      confirmLabel: "下一步",
+      message: isNew ? "新增外請工人需要驗證碼。" : <>修改 <b>{w.nameZh}</b> 的資料需要驗證碼。</>,
+      submit: async (code) => {
+        const res = await verifyCode("workers", isNew ? "create" : "update", code);
+        if (res.ok) setEditing({ worker: w, code });
+        return res;
+      },
+    });
+  }
+
+  function del(w: Worker) {
+    gate.ask({
+      title: "刪除外請工人",
+      confirmLabel: "確認刪除",
+      danger: true,
+      message: <>即將刪除外請工人 <b>{w.nameZh}</b>，無法復原。</>,
+      submit: (code) => removeWithCode("workers", w.id, code),
+    });
+  }
 
   const jobs = (w: Worker) =>
     db.bagging.filter((r) => r.workerIds.includes(w.id)).length +
@@ -35,7 +62,7 @@ export default function WorkersPage() {
         action={
           <Button
             onClick={() =>
-              setEditing({ id: uid(), nameZh: "", nameEn: "", phone: "", lineName: "", photo: "", createdAt: todayStr(), dailyRate: 1800 })
+              edit({ id: uid(), nameZh: "", nameEn: "", phone: "", lineName: "", photo: "", createdAt: todayStr(), dailyRate: 1800 })
             }
           >
             <Plus size={16} /> 新增工人
@@ -54,7 +81,7 @@ export default function WorkersPage() {
                   <UserRound size={26} />
                 </div>
               )}
-              <RowActions onEdit={() => setEditing(w)} onDelete={() => remove("workers", w.id)} />
+              <RowActions confirm={false} onEdit={() => edit(w)} onDelete={() => del(w)} />
             </div>
             <div className="mt-3 font-semibold text-stone-900">{w.nameZh}</div>
             <div className="text-sm text-stone-500">{w.nameEn || "—"}</div>
@@ -70,12 +97,14 @@ export default function WorkersPage() {
           </Card>
         ))}
       </div>
-      {editing && <WorkerModal worker={editing} onClose={() => setEditing(null)} />}
+      {gate.dialog}
+      {editing && <WorkerModal worker={editing.worker} code={editing.code} onClose={() => setEditing(null)} />}
     </>
   );
 }
 
-function WorkerModal({ worker, onClose }: { worker: Worker; onClose: () => void }) {
+/** code：打開前已驗證過的驗證碼，儲存時送給後端 */
+function WorkerModal({ worker, code, onClose }: { worker: Worker; code: string; onClose: () => void }) {
   const [w, setW] = useState(worker);
   return (
     <Modal
@@ -88,7 +117,7 @@ function WorkerModal({ worker, onClose }: { worker: Worker; onClose: () => void 
           <Button
             onClick={() => {
               if (!w.nameZh.trim()) return alert("請填寫中文姓名");
-              upsert("workers", w);
+              upsert("workers", w, { code });
               onClose();
             }}
           >

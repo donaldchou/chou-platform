@@ -2,7 +2,8 @@
 
 import { Fragment, useState, useSyncExternalStore } from "react";
 import { ExternalLink, LayoutGrid, List, Pencil, Play, Plus, Search, Star, Trash2, X } from "lucide-react";
-import { remove, upsert, useDB } from "@/lib/store";
+import { removeWithCode, upsert, useDB, verifyCode } from "@/lib/store";
+import { useCodeGate } from "@/components/code-modal";
 import { KNOWLEDGE_KINDS, type KnowledgeItem, type KnowledgeKind } from "@/lib/types";
 import { photoSrc, todayStr, uid } from "@/lib/utils";
 import {
@@ -23,7 +24,6 @@ import {
   Tabs,
   Td,
   Textarea,
-  confirmDelete,
   type Tone,
 } from "@/components/ui";
 
@@ -116,8 +116,41 @@ export default function KnowledgePage() {
   const [category, setCategory] = useState("");
   const [q, setQ] = useState("");
   const [viewId, setViewId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<KnowledgeItem | null>(null);
+  const [editing, setEditing] = useState<{ item: KnowledgeItem; code: string } | null>(null);
   const [layout, setLayout] = useLayout();
+  const gate = useCodeGate();
+
+  // 新增、修改、刪除都要先輸入驗證碼（後端也會再檢查）
+  function edit(k: KnowledgeItem) {
+    const isNew = !db.knowledge.some((x) => x.id === k.id);
+    gate.ask({
+      title: isNew ? "新增知識" : "編輯知識",
+      confirmLabel: "下一步",
+      message: isNew ? "新增知識需要驗證碼。" : <>編輯「<b>{k.title}</b>」需要驗證碼。</>,
+      submit: async (code) => {
+        const res = await verifyCode("knowledge", isNew ? "create" : "update", code);
+        if (res.ok) {
+          setViewId(null);
+          setEditing({ item: k, code });
+        }
+        return res;
+      },
+    });
+  }
+
+  function del(k: KnowledgeItem) {
+    gate.ask({
+      title: "刪除知識",
+      confirmLabel: "確認刪除",
+      danger: true,
+      message: <>即將刪除「<b>{k.title}</b>」，無法復原。</>,
+      submit: async (code) => {
+        const res = await removeWithCode("knowledge", k.id, code);
+        if (res.ok) setViewId(null);
+        return res;
+      },
+    });
+  }
 
   const categories = [...new Set(db.knowledge.map((k) => k.category).filter(Boolean))].sort();
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -152,7 +185,7 @@ export default function KnowledgePage() {
       <PageHeader
         title="知識管理"
         desc="備份 AI 問答與網路文章、收藏 YouTube 影片，整理重要資訊與歷年管理經驗。"
-        action={<Button onClick={() => setEditing(create())}><Plus size={16} /> 新增知識</Button>}
+        action={<Button onClick={() => edit(create())}><Plus size={16} /> 新增知識</Button>}
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_14rem_auto]">
@@ -215,12 +248,15 @@ export default function KnowledgePage() {
         <KnowledgeView
           item={viewing}
           onClose={() => setViewId(null)}
-          onEdit={() => { setViewId(null); setEditing(viewing); }}
+          onEdit={() => edit(viewing)}
+          onDelete={() => del(viewing)}
         />
       )}
+      {gate.dialog}
       {editing && (
         <KnowledgeModal
-          item={editing}
+          item={editing.item}
+          code={editing.code}
           categories={[...new Set([...DEFAULT_CATEGORIES, ...categories])]}
           onClose={() => setEditing(null)}
           onSaved={(id) => { setEditing(null); setViewId(id); }}
@@ -321,7 +357,17 @@ function KnowledgeTable({ list, onOpen }: { list: KnowledgeItem[]; onOpen: (k: K
 /** 卡片摘要用：拿掉 Markdown 符號 */
 const plain = (s: string) => s.replace(/[#*`>|]|[-=_]{3,}/g, "").replace(/\s+/g, " ").trim();
 
-function KnowledgeView({ item: k, onClose, onEdit }: { item: KnowledgeItem; onClose: () => void; onEdit: () => void }) {
+function KnowledgeView({
+  item: k,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  item: KnowledgeItem;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const videos = k.videos.map((url) => ({ url, yt: parseYouTube(url) })).filter((v) => v.url);
   return (
     <Modal
@@ -335,7 +381,7 @@ function KnowledgeView({ item: k, onClose, onEdit }: { item: KnowledgeItem; onCl
             <Button
               variant="secondary"
               className="mr-auto text-red-600"
-              onClick={() => { if (confirmDelete(`「${k.title}」`)) { void remove("knowledge", k.id); onClose(); } }}
+              onClick={onDelete}
             >
               <Trash2 size={16} /> 刪除
             </Button>
@@ -404,13 +450,16 @@ function KnowledgeView({ item: k, onClose, onEdit }: { item: KnowledgeItem; onCl
   );
 }
 
+/** code：打開前已驗證過的驗證碼，儲存時送給後端 */
 function KnowledgeModal({
   item,
+  code,
   categories,
   onClose,
   onSaved,
 }: {
   item: KnowledgeItem;
+  code: string;
   categories: string[];
   onClose: () => void;
   onSaved: (id: string) => void;
@@ -425,7 +474,7 @@ function KnowledgeModal({
     const videos = k.videos.map((v) => v.trim()).filter(Boolean);
     if (videos.some((v) => !parseYouTube(v)) && !confirm("有影片連結不是 YouTube 網址，無法直接播放，仍要儲存嗎？")) return;
     setSaving(true);
-    const ok = await upsert("knowledge", { ...k, title: k.title.trim(), videos });
+    const ok = await upsert("knowledge", { ...k, title: k.title.trim(), videos }, { code });
     setSaving(false);
     if (ok) onSaved(k.id);
   }

@@ -52,6 +52,8 @@ const MATERIAL_RULES: Rule[] = [
   },
 ];
 
+const STAFF_RULES: Rule[] = [{ env: "STAFF_CODE", actions: ["create", "update", "delete"] }];
+
 /** 需要驗證碼的操作 */
 const RULES: Partial<Record<string, Rule[]>> = {
   orchards: [
@@ -69,6 +71,15 @@ const RULES: Partial<Record<string, Rule[]>> = {
   labor: [{ env: "PRUNING_CODE", actions: ["create", "update", "delete"], applies: (doc) => doc.kind === "pruning" }],
   phenology: [{ env: "PRUNING_CODE", actions: ["create", "update", "delete"] }],
   propagation: [{ env: "PROPAGATION_CODE", actions: ["create", "update", "delete"] }],
+  knowledge: [{ env: "KNOWLEDGE_CODE", actions: ["create", "update", "delete"] }],
+  workers: [{ env: "WORKER_CODE", actions: ["create", "update", "delete"] }],
+  // 員工管理／指派頁面：工作指派、薪水、分紅、員工名冊共用一組
+  tasks: STAFF_RULES,
+  salaries: STAFF_RULES,
+  bonuses: STAFF_RULES,
+  employees: STAFF_RULES,
+  // 後台管理（使用者管理、所有資料的刪除），不是資料集合
+  admin: [{ env: "ADMIN_CODE", actions: ["create", "update", "delete"] }],
   materials: MATERIAL_RULES,
   // 庫存異動（進貨／盤點／報廢）用同一類資材的驗證碼
   stock: MATERIAL_RULES,

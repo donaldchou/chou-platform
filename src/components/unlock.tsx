@@ -14,6 +14,9 @@ const CODE_PAGES = [
   "/records/propagation",
   "/suppliers",
   "/materials",
+  "/workers",
+  "/knowledge",
+  "/staff",
 ]; // 後台管理頁有自己的解鎖區塊
 
 export const isCodePage = (pathname: string) =>

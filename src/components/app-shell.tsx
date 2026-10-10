@@ -67,7 +67,7 @@ const NAV = [
   {
     group: "人員",
     items: [
-      { href: "/staff", label: "員工工作回報", icon: ClipboardList },
+      { href: "/staff", label: "員工管理/指派", icon: ClipboardList },
       { href: "/workers", label: "外請工人", icon: Users },
       { href: "/knowledge", label: "知識管理", icon: BookOpen },
     ],

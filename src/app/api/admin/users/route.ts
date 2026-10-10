@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { HttpError, handleError, readJson } from "@/lib/api";
 import { assertPassword, hashPassword, publicUser, requireAdmin } from "@/lib/auth";
+import { assertCode, readCode } from "@/lib/codes";
 import { USER_ROLES, UserModel } from "@/models/user";
 
 /** GET /api/admin/users 所有使用者（管理者在前） */
@@ -14,10 +15,11 @@ export async function GET() {
   }
 }
 
-/** POST /api/admin/users { email, password, name?, role? } 新增使用者（預設一般使用者） */
+/** POST /api/admin/users { email, password, name?, role? } 新增使用者（預設一般使用者），需要驗證碼 */
 export async function POST(req: Request) {
   try {
-    await requireAdmin();
+    const admin = await requireAdmin();
+    assertCode("admin", "create", await readCode(req.headers, admin.id));
     const body = await readJson(req);
     const email = String(body.email ?? "").trim().toLowerCase();
     assertPassword(body.password);

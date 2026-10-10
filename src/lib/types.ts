@@ -385,6 +385,14 @@ export interface KnowledgeItem {
   pinned: boolean; // 重要，排在最前面
 }
 
+/** 常用平台：常用網站 */
+export interface Platform {
+  id: ID;
+  name: string; // 網站名稱
+  url: string; // 網站網址（http／https）
+  description: string; // 說明
+}
+
 export interface DB {
   orchards: Orchard[];
   bills: Bill[];
@@ -404,4 +412,5 @@ export interface DB {
   salaries: Salary[];
   bonuses: Bonus[];
   knowledge: KnowledgeItem[];
+  platforms: Platform[];
 }

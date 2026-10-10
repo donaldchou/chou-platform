@@ -7,7 +7,7 @@ import type { DB } from "./types";
 const EMPTY: DB = {
   orchards: [], bills: [], employees: [], workers: [], suppliers: [], materials: [], stock: [], bagging: [],
   harvests: [], fertilizing: [], spraying: [], labor: [], phenology: [], propagation: [], tasks: [], salaries: [], bonuses: [],
-  knowledge: [],
+  knowledge: [], platforms: [],
 };
 
 type Status = "idle" | "loading" | "ready" | "error";

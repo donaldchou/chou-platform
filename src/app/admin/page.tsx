@@ -386,6 +386,7 @@ const COLL_LABEL: Record<Coll, string> = {
   salaries: "薪資",
   bonuses: "分紅",
   knowledge: "知識管理",
+  platforms: "常用平台",
 };
 
 /** 列表上顯示的簡短說明：挑名稱、日期這類最好認的欄位 */

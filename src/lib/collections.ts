@@ -14,6 +14,7 @@ import {
   SprayingModel,
 } from "@/models/records";
 import { KnowledgeModel } from "@/models/knowledge";
+import { PlatformModel } from "@/models/platform";
 
 /** API 路徑 /api/<collection> 對應的 Mongoose model，名稱與前端 DB 的 key 相同。 */
 export const COLLECTIONS: Record<keyof DB, Model<unknown>> = {
@@ -35,6 +36,7 @@ export const COLLECTIONS: Record<keyof DB, Model<unknown>> = {
   salaries: SalaryModel,
   bonuses: BonusModel,
   knowledge: KnowledgeModel,
+  platforms: PlatformModel,
 };
 
 export type CollectionName = keyof DB;
@@ -87,4 +89,5 @@ export const SORT: Partial<Record<CollectionName, Record<string, 1 | -1>>> = {
   salaries: { month: -1 },
   bonuses: { date: -1 },
   knowledge: { date: -1 },
+  platforms: { name: 1 },
 };

@@ -14,6 +14,7 @@ import {
   ClipboardList,
   Droplets,
   FlaskConical,
+  Globe,
   LayoutDashboard,
   Leaf,
   LogOut,
@@ -76,7 +77,13 @@ const NAV = [
 ];
 
 /** 只有管理者看得到的選單 */
-const ADMIN_NAV = { group: "系統", items: [{ href: "/admin", label: "後台管理", icon: ShieldCheck }] };
+const ADMIN_NAV = {
+  group: "系統",
+  items: [
+    { href: "/admin", label: "後台管理", icon: ShieldCheck },
+    { href: "/platforms", label: "常用平台", icon: Globe },
+  ],
+};
 
 /** 不套用側邊選單的頁面 */
 const BARE_PAGES = ["/login"];

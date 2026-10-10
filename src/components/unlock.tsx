@@ -17,6 +17,7 @@ const CODE_PAGES = [
   "/workers",
   "/knowledge",
   "/staff",
+  "/platforms",
 ]; // 後台管理頁有自己的解鎖區塊
 
 export const isCodePage = (pathname: string) =>

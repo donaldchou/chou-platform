@@ -75,6 +75,7 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 | `fertilizing` | Fertilizing | 施肥：肥料與每棵樹用量、包數、對象、員工、參考照片 |
 | `spraying` | Spraying | 噴藥：用水量、藥品（陣列順序＝加入順序）、對象、AI 建議 |
 | `labor` | Labor | 剪枝／砍草（`kind`: pruning / weeding）：外請工人日薪、進場紀錄、工資結算；剪枝另有作物 `fruits`（可複選） |
+| `platforms` | Platform | 常用平台：網站名稱、網址（只接受 http／https）、說明；新增／修改／刪除用 `ADMIN_CODE` |
 | `phenology` | Phenology | 開花／結果／疏果（`kind`: flowering / fruiting / thinning）：作物（`fruits` 可複選）、品種、起訖日期、照片 |
 | `suppliers` | Supplier | 貨源店家：店家電話、聯絡人與電話（最多 3 組）、地址、名片（多張） |
 | `materials` | Material | 農藥／肥料／包材（`category`），含歷史價格、多張照片；`targets` 是「成分說明」；`minStock` 安全存量（瓶／包）；包材的 `bagType` 對應套袋紙袋類型 |

@@ -80,6 +80,8 @@ const RULES: Partial<Record<string, Rule[]>> = {
   employees: STAFF_RULES,
   // 後台管理（使用者管理、所有資料的刪除），不是資料集合
   admin: [{ env: "ADMIN_CODE", actions: ["create", "update", "delete"] }],
+  // 常用平台放在「系統」選單，和後台管理共用驗證碼
+  platforms: [{ env: "ADMIN_CODE", actions: ["create", "update", "delete"] }],
   materials: MATERIAL_RULES,
   // 庫存異動（進貨／盤點／報廢）用同一類資材的驗證碼
   stock: MATERIAL_RULES,

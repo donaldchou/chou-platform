@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { Attendance, BentoMode, BoxUsage, Orchard } from "@/lib/types";
@@ -66,6 +67,47 @@ export function TargetPicker({
     </Field>
   );
 }
+
+/** 作物複選：常用作物點選，其它作物打字後按 Enter 加入（已加入的會變成可取消的選項） */
+export function FruitPicker({
+  value,
+  onChange,
+  label = "作物（可複選）",
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  label?: string;
+}) {
+  const [other, setOther] = useState("");
+  const options = [...FRUITS, ...value.filter((v) => !(FRUITS as readonly string[]).includes(v))];
+  const add = () => {
+    const v = other.trim();
+    if (v && !value.includes(v)) onChange([...value, v]);
+    setOther("");
+  };
+  return (
+    <Field label={label} group>
+      <div className="flex flex-wrap items-center gap-2">
+        <ChipSelect options={options.map((f) => ({ value: f, label: f }))} value={value} onChange={onChange} />
+        <Input
+          value={other}
+          onChange={(e) => setOther(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          onBlur={add}
+          placeholder="其它作物，按 Enter 加入"
+          className="!w-48"
+        />
+      </div>
+    </Field>
+  );
+}
+
+export const fruitsText = (fruits: string[] | undefined) => (fruits ?? []).join("、");
 
 export const targetsText = (targets: string[], other: string) =>
   [...targets, ...(other ? [other] : [])].join("、") || "—";

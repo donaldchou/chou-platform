@@ -275,6 +275,7 @@ export interface LaborRecord {
   bentoMode: BentoMode;
   wages: LaborWage[];
   note?: string; // 舊紀錄沒有這個欄位
+  fruits?: string[]; // 剪枝：作物（可複選）；舊紀錄沒有這個欄位
 }
 
 /** 開花／結果／疏果紀錄：記錄各作物的起訖時間與當下照片 */
@@ -290,7 +291,7 @@ export interface PhenologyRecord {
   id: ID;
   kind: PhenologyKind;
   orchardId: ID;
-  fruit: string; // 作物
+  fruits: string[]; // 作物（可複選）
   variety: string; // 品種
   start: string; // 開始日期 YYYY-MM-DD
   end: string; // 結束日期，空白＝進行中

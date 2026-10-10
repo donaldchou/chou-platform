@@ -8,6 +8,7 @@ import {
   Apple,
   BookOpen,
   Boxes,
+  ChevronDown,
   ChevronsLeft,
   ChevronsRight,
   ClipboardList,
@@ -116,6 +117,57 @@ function useCollapsed(): [boolean, (v: boolean) => void] {
   return [collapsed, writeCollapsed];
 }
 
+/* ---------------- 選單分組的展開／收合，記在這台電腦的瀏覽器 ---------------- */
+const GROUPS_KEY = "chou-nav-closed-groups";
+const groupListeners = new Set<() => void>();
+let memoryGroups: string | null = null; // JSON 字串，讓 useSyncExternalStore 拿到穩定的值
+
+function readClosedGroups(): string {
+  if (memoryGroups !== null) return memoryGroups;
+  try {
+    return localStorage.getItem(GROUPS_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+function saveClosedGroups(closed: Set<string>) {
+  memoryGroups = JSON.stringify([...closed]);
+  try {
+    localStorage.setItem(GROUPS_KEY, memoryGroups);
+  } catch {
+    // 無法儲存（例如無痕模式）時，只在這次瀏覽有效
+  }
+  groupListeners.forEach((l) => l());
+}
+
+function useClosedGroups(): [Set<string>, (group: string) => void, (groups: string[]) => void] {
+  const raw = useSyncExternalStore(
+    (l) => {
+      groupListeners.add(l);
+      return () => groupListeners.delete(l);
+    },
+    readClosedGroups,
+    () => "[]",
+  );
+  let closed: Set<string>;
+  try {
+    closed = new Set(JSON.parse(raw) as string[]);
+  } catch {
+    closed = new Set();
+  }
+  const toggle = (group: string) => {
+    const next = new Set(closed);
+    if (next.has(group)) next.delete(group);
+    else next.add(group);
+    saveClosedGroups(next);
+  };
+  // 全部收合；已經全部收合時改成全部展開
+  const toggleAll = (groups: string[]) =>
+    saveClosedGroups(groups.every((g) => closed.has(g)) ? new Set() : new Set(groups));
+  return [closed, toggle, toggleAll];
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   if (BARE_PAGES.includes(pathname)) return <>{children}</>;
@@ -126,9 +178,11 @@ function Shell({ pathname, children }: { pathname: string; children: React.React
   const [open, setOpen] = useState(false);
   // 只有桌機的浮動選單會收合；手機仍用抽屜
   const [collapsed, setCollapsed] = useCollapsed();
+  const [closedGroups, toggleGroup, toggleAllGroups] = useClosedGroups();
   const me = useMe();
   const groups = me?.role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
   const roleLabel = me ? (me.role === "admin" ? "管理者" : "一般使用者（唯讀）") : "";
+  const allClosed = groups.every((g) => closedGroups.has(g.group));
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
@@ -136,9 +190,16 @@ function Shell({ pathname, children }: { pathname: string; children: React.React
   const nav = (mini: boolean) => (
     <nav className="flex h-full flex-col">
       <div className={`flex items-center gap-2 py-5 ${mini ? "justify-center px-2" : "px-5"}`}>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+        {/* 點圖示：全部分組展開／收合（只剩圖示的窄選單沒有分組，改成展開選單） */}
+        <button
+          type="button"
+          onClick={() => (mini ? setCollapsed(false) : toggleAllGroups(groups.map((g) => g.group)))}
+          title={mini ? "展開選單" : allClosed ? "全部展開" : "全部收合"}
+          aria-label={mini ? "展開選單" : allClosed ? "全部展開" : "全部收合"}
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-emerald-600 text-white transition-colors hover:bg-emerald-500"
+        >
           <Boxes size={22} />
-        </div>
+        </button>
         {!mini && (
           <div className="min-w-0">
             <div className="truncate text-lg font-bold leading-tight text-white">CHOU 農場平台</div>
@@ -150,30 +211,48 @@ function Shell({ pathname, children }: { pathname: string; children: React.React
         className={`flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-4 ${mini ? "px-2" : "px-3"}`}
         style={{ scrollbarWidth: "thin", scrollbarColor: "#047857 transparent" }}
       >
-        {groups.map((g) => (
-          <div key={g.group}>
-            {mini ? (
-              <div className="mx-2 mb-2 border-t border-emerald-800" />
-            ) : (
-              <div className="px-2 pb-1 text-sm font-semibold tracking-wider text-emerald-300/70">{g.group}</div>
-            )}
-            {g.items.map((it) => (
-              <Link
-                key={it.href}
-                href={it.href}
-                onClick={() => setOpen(false)}
-                title={mini ? it.label : undefined}
-                aria-label={mini ? it.label : undefined}
-                className={`flex items-center gap-3 rounded-lg py-2.5 text-base transition-colors ${
-                  mini ? "justify-center px-0" : "px-3"
-                } ${isActive(it.href) ? "bg-emerald-700 font-medium text-white" : "text-emerald-50/85 hover:bg-emerald-800/70"}`}
-              >
-                <it.icon size={20} className="shrink-0" />
-                {!mini && <span className="truncate">{it.label}</span>}
-              </Link>
-            ))}
-          </div>
-        ))}
+        {groups.map((g) => {
+          // 只剩圖示的窄選單不分組收合；收合的分組裡如果有目前頁面，標題會亮起來提示
+          const open = mini || !closedGroups.has(g.group);
+          const hasActive = g.items.some((it) => isActive(it.href));
+          return (
+            <div key={g.group}>
+              {mini ? (
+                <div className="mx-2 mb-2 border-t border-emerald-800" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(g.group)}
+                  aria-expanded={open}
+                  className={`flex w-full cursor-pointer items-center justify-between rounded-md px-2 pb-1 pt-0.5 text-sm font-semibold tracking-wider hover:text-emerald-100 ${
+                    !open && hasActive ? "text-emerald-100" : "text-emerald-300/70"
+                  }`}
+                >
+                  <span>{g.group}</span>
+                  <span className="flex items-center gap-1.5">
+                    {!open && <span className="text-xs font-normal">{g.items.length}</span>}
+                    <ChevronDown size={16} className={`transition-transform ${open ? "" : "-rotate-90"}`} />
+                  </span>
+                </button>
+              )}
+              {open && g.items.map((it) => (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  onClick={() => setOpen(false)}
+                  title={mini ? it.label : undefined}
+                  aria-label={mini ? it.label : undefined}
+                  className={`flex items-center gap-3 rounded-lg py-2.5 text-base transition-colors ${
+                    mini ? "justify-center px-0" : "px-3"
+                  } ${isActive(it.href) ? "bg-emerald-700 font-medium text-white" : "text-emerald-50/85 hover:bg-emerald-800/70"}`}
+                >
+                  <it.icon size={20} className="shrink-0" />
+                  {!mini && <span className="truncate">{it.label}</span>}
+                </Link>
+              ))}
+            </div>
+          );
+        })}
       </div>
       <div className="space-y-1 border-t border-emerald-800 p-3">
         <div

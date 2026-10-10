@@ -7,7 +7,6 @@ import { useCodeGate } from "@/components/code-modal";
 import { ALL_YEARS, RecordsToolbar } from "@/components/record-calendar";
 import { SortableTable, fruitRank, zh, type GroupDef, type SortCol } from "@/components/sortable-table";
 import {
-  FRUITS,
   PHENOLOGY_KINDS,
   type LaborRecord,
   type PhenologyKind,
@@ -15,11 +14,10 @@ import {
 } from "@/lib/types";
 import { daySpan, defaultOrchard, money, todayStr, uid } from "@/lib/utils";
 import { LaborModal, laborDesc, laborTotal, newLaborRecord } from "@/components/labor-page";
-import { OrchardSelect } from "@/components/record-parts";
+import { FruitPicker, OrchardSelect, fruitsText } from "@/components/record-parts";
 import {
   Badge,
   Button,
-  ComboInput,
   Field,
   Input,
   Modal,
@@ -110,7 +108,7 @@ export default function PruningPage() {
         id: uid(),
         kind: t,
         orchardId: defaultOrchard(db.orchards)?.id ?? "",
-        fruit: FRUITS[0],
+        fruits: [],
         variety: "",
         start: todayStr(),
         end: "",
@@ -174,7 +172,7 @@ interface Row {
   id: string;
   kind: Kind;
   orchardId: string;
-  fruit: string;
+  fruits: string[];
   variety: string;
   start: string;
   end: string;
@@ -212,7 +210,7 @@ function RecordsTable({
     ...db.labor
       .filter((r) => r.kind === "pruning")
       .map((r) => ({
-        id: r.id, kind: "pruning" as Kind, orchardId: r.orchardId, fruit: "", variety: "",
+        id: r.id, kind: "pruning" as Kind, orchardId: r.orchardId, fruits: r.fruits ?? [], variety: "",
         start: r.start, end: r.end, days: r.end ? daySpan(r.start, r.end) : -1, photos: [], note: r.note ?? "",
         employees: names(r.employeeIds),
         workers: r.workers.map((w) => db.workers.find((x) => x.id === w.workerId)?.nameZh).filter(Boolean).join("、"),
@@ -220,7 +218,7 @@ function RecordsTable({
         target: { coll: "labor" as const, record: r },
       })),
     ...db.phenology.map((r) => ({
-      id: r.id, kind: r.kind as Kind, orchardId: r.orchardId, fruit: r.fruit, variety: r.variety,
+      id: r.id, kind: r.kind as Kind, orchardId: r.orchardId, fruits: r.fruits ?? [], variety: r.variety,
       start: r.start, end: r.end, days: r.end ? daySpan(r.start, r.end) : -1, photos: r.photos, note: r.note,
       employees: "", workers: "", wage: 0,
       target: { coll: "phenology" as const, record: r },
@@ -247,6 +245,14 @@ function RecordsTable({
     sort: (a, b) => (a.end || "9999").localeCompare(b.end || "9999"),
     cell: (r) => r.end || <Badge tone="amber">進行中</Badge>,
   });
+  // 作物複選：依最常用的那一種作物排序，再比全部作物與品種
+  const fruitCol = (label: string): SortCol<Row> => ({
+    key: "fruit", label,
+    sort: (a, b) =>
+      Math.min(fruitRank(""), ...a.fruits.map(fruitRank)) - Math.min(fruitRank(""), ...b.fruits.map(fruitRank)) ||
+      zh(a.fruits.join("、"), b.fruits.join("、")) || zh(a.variety, b.variety),
+    cell: (r) => [fruitsText(r.fruits), r.variety].filter(Boolean).join("・") || "—",
+  });
   const daysCol = (label: string): SortCol<Row> => ({
     key: "days", label, sort: (a, b) => a.days - b.days, cell: (r) => (r.days >= 0 ? `${r.days} 天` : "—"),
   });
@@ -255,6 +261,7 @@ function RecordsTable({
     tab === "pruning"
       ? [
           orchardCol,
+          fruitCol("作物"),
           startCol("開始日期"),
           endCol("完工日期"),
           daysCol("工期"),
@@ -272,11 +279,7 @@ function RecordsTable({
               }]
             : []),
           orchardCol,
-          {
-            key: "fruit", label: "作物／品種",
-            sort: (a, b) => fruitRank(a.fruit) - fruitRank(b.fruit) || zh(a.fruit, b.fruit) || zh(a.variety, b.variety),
-            cell: (r) => [r.fruit, r.variety].filter(Boolean).join("・") || "—",
-          },
+          fruitCol("作物／品種"),
           startCol("開始日期"),
           endCol("結束日期"),
           daysCol("天數"),
@@ -304,23 +307,26 @@ function RecordsTable({
       value: "orchard", label: "果園",
       of: (r) => ({ key: r.orchardId, label: orchard(r.orchardId)?.nameZh ?? "（已刪除）", rank: [orchardIndex(r.orchardId), ""] }),
     },
-    // 剪枝沒有作物欄，不提供依作物分組
+    // 作物可複選：一筆紀錄會出現在它每一種作物的組裡
+    {
+      value: "fruit", label: "作物",
+      of: (r) =>
+        r.fruits.length
+          ? r.fruits.map((f) => ({ key: f, label: f, rank: [fruitRank(f), f] as [number, string] }))
+          : { key: "", label: "未填作物", rank: [fruitRank(""), ""] },
+    },
+    // 剪枝沒有品種欄
     ...(tab === "pruning"
       ? []
-      : [
-          {
-            value: "fruit", label: "作物",
-            of: (r: Row) => ({ key: r.fruit, label: r.fruit || "未填作物", rank: [fruitRank(r.fruit), r.fruit] as [number, string] }),
-          },
-          {
-            value: "fruitVariety", label: "作物／品種",
-            of: (r: Row) => ({
-              key: `${r.fruit}|${r.variety}`,
-              label: [r.fruit, r.variety].filter(Boolean).join("／") || "未填作物",
-              rank: [fruitRank(r.fruit), `${r.fruit}|${r.variety}`] as [number, string],
-            }),
-          },
-        ]),
+      : [{
+          value: "fruitVariety", label: "作物／品種",
+          of: (r: Row) =>
+            (r.fruits.length ? r.fruits : [""]).map((f) => ({
+              key: `${f}|${r.variety}`,
+              label: [f, r.variety].filter(Boolean).join("／") || "未填作物",
+              rank: [fruitRank(f), `${f}|${r.variety}`] as [number, string],
+            })),
+        }]),
     // 只有「全部」才能依項目分組
     ...(tab === "all"
       ? [{
@@ -344,7 +350,7 @@ function RecordsTable({
       searchText={(r) =>
         [
           KIND_LABEL[r.kind], orchard(r.orchardId)?.nameZh, orchard(r.orchardId)?.nameEn,
-          r.fruit, r.variety, r.start, r.end, r.note, r.employees, r.workers,
+          ...r.fruits, r.variety, r.start, r.end, r.note, r.employees, r.workers,
         ].join(" ")
       }
       searchPlaceholder="關鍵字：果園、作物、品種、日期、人員、備註…"
@@ -379,13 +385,13 @@ function PhenologyModal({ record, code, onClose }: { record: PhenologyRecord; co
         </Field>
         <OrchardSelect value={r.orchardId} onChange={(v) => set("orchardId", v)} />
         <div />
-        <Field label="作物">
-          <ComboInput value={r.fruit} options={[...FRUITS]} onChange={(v) => set("fruit", v)} />
-        </Field>
+        <div className="sm:col-span-3">
+          <FruitPicker value={r.fruits} onChange={(v) => set("fruits", v)} />
+        </div>
         <Field label="品種">
           <Input value={r.variety} onChange={(e) => set("variety", e.target.value)} />
         </Field>
-        <div />
+        <div className="sm:col-span-2" />
         <Field label={`${label}開始日期`}>
           <Input type="date" value={r.start} onChange={(e) => set("start", e.target.value)} />
         </Field>

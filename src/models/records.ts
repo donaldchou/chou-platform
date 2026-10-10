@@ -139,6 +139,7 @@ const LaborSchema = new Schema({
     default: [],
   },
   note: str,
+  fruits: { type: [String], default: [] }, // 剪枝：作物（可複選）
 });
 
 /** 開花／結果／疏果紀錄（kind 區分） */
@@ -146,7 +147,7 @@ const PhenologySchema = new Schema({
   _id: idField,
   kind: { type: String, enum: ["flowering", "fruiting", "thinning"], required: true, index: true },
   orchardId: orchardRef,
-  fruit: str, // 作物
+  fruits: { type: [String], default: [] }, // 作物（可複選）
   variety: str, // 品種
   start: ymd,
   end: ymd, // 空白＝進行中

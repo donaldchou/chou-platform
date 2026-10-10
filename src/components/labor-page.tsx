@@ -12,6 +12,7 @@ import {
   EditorRows,
   EmployeePicker,
   Formula,
+  FruitPicker,
   OrchardSelect,
 } from "./record-parts";
 import {
@@ -38,7 +39,7 @@ export const laborTotal = (r: LaborRecord) =>
 
 export const newLaborRecord = (kind: LaborKind, db: DB): LaborRecord => ({
   id: uid(), kind, orchardId: defaultOrchard(db.orchards)?.id ?? "", start: todayStr(), end: "",
-  employeeIds: [], workers: [], attendance: [], bentoMode: "便當", wages: [], note: "",
+  employeeIds: [], workers: [], attendance: [], bentoMode: "便當", wages: [], note: "", fruits: [],
 });
 
 /** 今年累計工資的說明文字 */
@@ -105,7 +106,7 @@ export function LaborModal({ record, code, onClose }: { record: LaborRecord; cod
   const db = useDB();
   const label = LABOR_LABEL[record.kind];
   // 舊紀錄沒有 note 欄位
-  const [r, setR] = useState({ ...record, note: record.note ?? "" });
+  const [r, setR] = useState({ ...record, note: record.note ?? "", fruits: record.fruits ?? [] });
   const set = <K extends keyof LaborRecord>(k: K, v: LaborRecord[K]) => setR((p) => ({ ...p, [k]: v }));
   const workerName = (id: string) => db.workers.find((w) => w.id === id)?.nameZh ?? "";
   const names = r.workers.map((w) => workerName(w.workerId)).filter(Boolean);
@@ -151,6 +152,12 @@ export function LaborModal({ record, code, onClose }: { record: LaborRecord; cod
           <Input type="date" value={r.end} onChange={(e) => set("end", e.target.value)} />
         </Field>
       </div>
+      {/* 剪枝要記錄是哪些作物；砍草不分作物 */}
+      {r.kind === "pruning" && (
+        <div className="mt-4">
+          <FruitPicker value={r.fruits} onChange={(v) => set("fruits", v)} />
+        </div>
+      )}
       <div className="mt-4">
         <EmployeePicker value={r.employeeIds} onChange={(v) => set("employeeIds", v)} />
       </div>

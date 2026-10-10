@@ -16,11 +16,16 @@ export interface SortCol<T> {
   className?: string;
 }
 
-/** 分組方式：of 回傳這一列屬於哪一組；rank 決定組的順序（先比數字再比文字） */
+type GroupOf = { key: string; label: string; rank: [number, string] };
+
+/**
+ * 分組方式：of 回傳這一列屬於哪一組；rank 決定組的順序（先比數字再比文字）。
+ * 回傳多組時（例如複選的作物），這一列會出現在每一組裡。
+ */
 export interface GroupDef<T> {
   value: string;
   label: string;
-  of: (r: T) => { key: string; label: string; rank: [number, string] };
+  of: (r: T) => GroupOf | GroupOf[];
 }
 
 /** 作物依常用順序，其他的排後面、空白最後 */
@@ -84,13 +89,16 @@ export function SortableTable<T>({
 
   const def = groups.find((g) => g.value === group);
   const activeGroup = def ? group : "none";
-  const grouped: { key: string; label: string; rank: [number, string]; rows: T[] }[] = [];
+  const grouped: (GroupOf & { rows: T[] })[] = [];
   if (def) {
     for (const r of sorted) {
-      const g = def.of(r);
-      const found = grouped.find((x) => x.key === g.key);
-      if (found) found.rows.push(r);
-      else grouped.push({ ...g, rows: [r] });
+      const of = def.of(r);
+      for (const g of Array.isArray(of) ? of : [of]) {
+        const found = grouped.find((x) => x.key === g.key);
+        if (found) {
+          if (!found.rows.includes(r)) found.rows.push(r);
+        } else grouped.push({ ...g, rows: [r] });
+      }
     }
     grouped.sort((a, b) => a.rank[0] - b.rank[0] || zh(a.rank[1], b.rank[1]));
   }

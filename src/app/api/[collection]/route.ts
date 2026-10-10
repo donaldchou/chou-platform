@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { HttpError, handleError, readJson } from "@/lib/api";
 import { requireAdmin, requireUser } from "@/lib/auth";
-import { assertCode, codeFromHeaders } from "@/lib/codes";
+import { assertCode, readCode } from "@/lib/codes";
 import { isCollection } from "@/lib/collections";
 import { createDoc, listDocs } from "@/lib/repo";
 
@@ -25,10 +25,10 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/api/[collection]
 /** POST /api/<collection> 新增一筆 */
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/[collection]">) {
   try {
-    await requireAdmin();
+    const user = await requireAdmin();
     const name = await collectionOf(ctx);
     const body = await readJson(req);
-    assertCode(name, "create", codeFromHeaders(req.headers), [body]);
+    assertCode(name, "create", await readCode(req.headers, user.id), [body]);
     return NextResponse.json(await createDoc(name, body), { status: 201 });
   } catch (err) {
     return handleError(err);

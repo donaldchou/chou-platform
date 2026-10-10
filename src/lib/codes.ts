@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
+import { cookies } from "next/headers";
 import { HttpError } from "./api";
+import { UNLOCK_COOKIE, verifyUnlock } from "./session";
 
 export type CodeAction = "create" | "update" | "delete";
 type Doc = Record<string, unknown> | null | undefined;
@@ -63,6 +65,10 @@ const RULES: Partial<Record<string, Rule[]>> = {
   suppliers: [{ env: "SUPPLIER_CODE", actions: ["create", "update", "delete"] }],
   spraying: [{ env: "SPRAYING_CODE", actions: ["create", "update", "delete"] }],
   fertilizing: [{ env: "FERTILIZING_CODE", actions: ["create", "update", "delete"] }],
+  // 剪枝／開花／結果／疏果頁面共用一組驗證碼；labor 裡的砍草不需要
+  labor: [{ env: "PRUNING_CODE", actions: ["create", "update", "delete"], applies: (doc) => doc.kind === "pruning" }],
+  phenology: [{ env: "PRUNING_CODE", actions: ["create", "update", "delete"] }],
+  propagation: [{ env: "PROPAGATION_CODE", actions: ["create", "update", "delete"] }],
   materials: MATERIAL_RULES,
   // 庫存異動（進貨／盤點／報廢）用同一類資材的驗證碼
   stock: MATERIAL_RULES,
@@ -88,24 +94,45 @@ function ruleFor(collection: string, action: CodeAction, docs: Doc[]) {
 export const needsCode = (collection: string, action: CodeAction, docs: Doc[] = []) =>
   !!ruleFor(collection, action, docs);
 
-/** 從 header 取出驗證碼（前端用 encodeURIComponent 送出，避免中文無法放進 header） */
-export function codeFromHeaders(headers: Headers) {
+/** 這次請求帶的驗證碼，以及是否在後台解鎖的 1 小時內 */
+export type CodeInput = { code: string; unlocked: boolean };
+
+/** 從 header 取出驗證碼（前端用 encodeURIComponent 送出，避免中文無法放進 header），並檢查解鎖 cookie */
+export async function readCode(headers: Headers, userId: string): Promise<CodeInput> {
+  let code: string;
   try {
-    return decodeURIComponent(headers.get(CODE_HEADER) ?? "");
+    code = decodeURIComponent(headers.get(CODE_HEADER) ?? "");
   } catch {
-    return "";
+    code = "";
   }
+  const unlocked = (await verifyUnlock((await cookies()).get(UNLOCK_COOKIE)?.value, userId)) !== null;
+  return { code, unlocked };
 }
 
-/** 需要驗證碼而且驗證碼錯誤時丟出 403 */
-export function assertCode(collection: string, action: CodeAction, given: string, docs: Doc[] = []) {
-  const rule = ruleFor(collection, action, docs);
-  if (!rule) return;
-  const expected = process.env[rule.env];
-  if (!expected) throw new HttpError(500, `伺服器尚未設定 ${rule.env}`);
+function sameCode(given: string, expected: string) {
   const a = Buffer.from(given);
   const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    throw new HttpError(403, `驗證碼錯誤，無法${ACTION_LABEL[action]}`);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** 需要驗證碼而且驗證碼錯誤時丟出 403；後台解鎖期間直接通過 */
+export function assertCode(collection: string, action: CodeAction, given: CodeInput, docs: Doc[] = []) {
+  const rule = ruleFor(collection, action, docs);
+  if (!rule || given.unlocked) return;
+  const expected = process.env[rule.env];
+  if (!expected) throw new HttpError(500, `伺服器尚未設定 ${rule.env}`);
+  if (!sameCode(given.code, expected)) throw new HttpError(403, `驗證碼錯誤，無法${ACTION_LABEL[action]}`);
+}
+
+/**
+ * 後台解鎖用：驗證碼必須和所有頁面的驗證碼都相符，
+ * 解鎖後才不會比原本個別輸入擁有更多權限。
+ */
+export function assertUnlockCode(given: string) {
+  const envs = [...new Set(Object.values(RULES).flatMap((rules) => rules!.map((r) => r.env)))];
+  for (const env of envs) {
+    const expected = process.env[env];
+    if (!expected) throw new HttpError(500, `伺服器尚未設定 ${env}`);
+    if (!sameCode(given, expected)) throw new HttpError(403, "驗證碼錯誤，無法解鎖");
   }
 }

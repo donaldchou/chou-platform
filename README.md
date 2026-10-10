@@ -25,6 +25,8 @@ PESTICIDE_CODE=...                # 必填，新增／編輯／刪除農藥時�
 PACKAGING_CODE=...                # 必填，新增／編輯／刪除包材／乾貨時要輸入的驗證碼
 SPRAYING_CODE=...                 # 必填，新增／編輯／刪除噴藥紀錄時要輸入的驗證碼
 FERTILIZING_CODE=...              # 必填，新增／編輯／刪除施肥紀錄時要輸入的驗證碼
+PRUNING_CODE=...                  # 必填，新增／編輯／刪除剪枝／開花／結果／疏果紀錄時要輸入的驗證碼
+PROPAGATION_CODE=...              # 必填，新增／編輯／刪除種苗／嫁接／環剝紀錄時要輸入的驗證碼
 JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少 32 個字元的亂碼）
 ```
 
@@ -100,7 +102,8 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 - **資材價格歷史**：價格變動時，後端自動把舊價格加進 `priceHistory`，並更新「資訊異動時間」。
 - **刪除果園**：底下還有紀錄時回 409 和各類紀錄筆數；帶 `?cascade=true` 才會一併刪除。
 - **庫存**：目前庫存不存在資料庫，由前端 `src/lib/stock.ts` 依時間順序計算：進貨＋、報廢−、盤點直接設定成實際數量，噴藥（`amount`）、施肥（包數 × 每包容量）、套袋（箱數 × 每箱袋數，結餘袋數加回）自動扣除。每項資材從第一次盤點／進貨開始計算，之前的用量不扣；未來時間的紀錄不扣。`stock` 的 `category` 由後端依資材設定；只改 `minStock` 不更新資材的異動時間；刪除資材會一併刪除它的庫存異動。
-- **驗證碼**：新增／編輯／刪除果園（`ORCHARD_CODE`；只改水塔管線照片不需要）、貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`；庫存異動依資材類別使用同一組驗證碼）、噴藥紀錄（`SPRAYING_CODE`）與施肥紀錄（`FERTILIZING_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
+- **驗證碼**：新增／編輯／刪除果園（`ORCHARD_CODE`；只改水塔管線照片不需要）、貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`；庫存異動依資材類別使用同一組驗證碼）、噴藥紀錄（`SPRAYING_CODE`）、施肥紀錄（`FERTILIZING_CODE`）、剪枝／開花／結果／疏果紀錄（`PRUNING_CODE`；砍草不需要）與種苗／嫁接／環剝紀錄（`PROPAGATION_CODE`）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
+- **驗證碼解鎖**：後台管理頁輸入一次驗證碼（必須和上面所有驗證碼都相符），`POST /api/unlock` 會發一個綁定登入者、1 小時有效的 HttpOnly cookie `chou_unlock`，期間所有需要驗證碼的操作都不用帶 `x-verify-code`。`GET /api/unlock` 回傳到期時間，`DELETE /api/unlock` 提前鎖定，登出時也會清掉。有驗證碼的頁面上方會顯示倒數。
 - **照片**：瀏覽器先壓縮成 JPEG（最長邊 1600px），上傳到 Vercel Blob 的 `chou-platform/<folder>/`，MongoDB 只存檔案網址（base64 會被拒絕）。編輯時移除的照片、刪除資料（含果園連帶刪除的紀錄）時的照片，會自動從 Blob 刪除。
 
 ### 其他

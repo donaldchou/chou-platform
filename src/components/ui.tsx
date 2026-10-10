@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ImagePlus, Pencil, Trash2, X } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Lightbox } from "./lightbox";
+import { UnlockTimer, isCodePage } from "./unlock";
 import { useCanEdit } from "@/lib/store";
 import { photoSrc, uploadPhoto } from "@/lib/utils";
 
@@ -28,10 +30,15 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   const canEdit = useCanEdit();
+  const pathname = usePathname();
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold text-stone-900">{title}</h1>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-2xl font-bold text-stone-900">{title}</h1>
+          {/* 有驗證碼的頁面：標題後面顯示解鎖倒數 */}
+          {isCodePage(pathname) && <UnlockTimer />}
+        </div>
         {desc && <p className="mt-1 text-sm text-stone-500">{desc}</p>}
       </div>
       {action && canEdit && <div className="flex flex-wrap gap-2">{action}</div>}

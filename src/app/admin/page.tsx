@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Eye, KeyRound, Plus, Search, Trash2 } from "lucide-react";
 import { CodeModal } from "@/components/code-modal";
+import { UnlockPanel } from "@/components/unlock-panel";
 import {
   Badge,
   Button,
@@ -26,6 +27,7 @@ export default function AdminPage() {
   return (
     <>
       <PageHeader title="後台管理" desc="管理登入帳號，以及檢視、刪除資料庫裡的所有資料。只有管理者看得到這一頁。" />
+      <UnlockPanel />
       <Tabs<Tab>
         value={tab}
         onChange={setTab}

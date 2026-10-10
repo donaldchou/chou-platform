@@ -82,6 +82,9 @@ export function useRecordsFilter() {
   };
 }
 
+/** 年度選單的「全部年度」 */
+export const ALL_YEARS = 0;
+
 export function RecordsToolbar({
   years,
   year,
@@ -91,27 +94,38 @@ export function RecordsToolbar({
   view,
   setView,
   count,
-}: Pick<ReturnType<typeof useRecordsFilter>, "years" | "year" | "setYear" | "minYear" | "maxYear" | "view" | "setView"> & {
+  allowAll = false,
+  showViews = true,
+}: Pick<ReturnType<typeof useRecordsFilter>, "years" | "year" | "minYear" | "maxYear"> & {
+  setYear: (y: number) => void;
+  view?: RecordsView;
+  setView?: (v: RecordsView) => void;
   count: string;
+  /** 多一個「全部年度」選項（year = ALL_YEARS） */
+  allowAll?: boolean;
+  /** 清單／日曆／月曆切換（沒有日曆的頁面關掉） */
+  showViews?: boolean;
 }) {
+  const all = year === ALL_YEARS;
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-1.5 text-sm text-stone-600">
-        <Button variant="secondary" disabled={year <= minYear} onClick={() => setYear(year - 1)} aria-label="上年度">
+        <Button variant="secondary" disabled={all || year <= minYear} onClick={() => setYear(year - 1)} aria-label="上年度">
           <ChevronLeft size={16} /> <span className="hidden sm:inline">上年度</span>
         </Button>
         <label className="flex items-center gap-2">
           <span className="sr-only sm:not-sr-only">年度</span>
-          <Select value={year} onChange={(e) => setYear(Number(e.target.value))} className="!w-28">
+          <Select value={year} onChange={(e) => setYear(Number(e.target.value))} className="!w-32">
+            {allowAll && <option value={ALL_YEARS}>全部年度</option>}
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
           </Select>
         </label>
-        <Button variant="secondary" disabled={year >= maxYear} onClick={() => setYear(year + 1)} aria-label="下年度">
+        <Button variant="secondary" disabled={all || year >= maxYear} onClick={() => setYear(year + 1)} aria-label="下年度">
           <span className="hidden sm:inline">下年度</span> <ChevronRight size={16} />
         </Button>
       </div>
       <span className="text-sm text-stone-500">{count}</span>
-      <div className="ml-auto flex rounded-lg border border-stone-300 bg-white p-0.5" role="group" aria-label="顯示方式">
+      {showViews && <div className="ml-auto flex rounded-lg border border-stone-300 bg-white p-0.5" role="group" aria-label="顯示方式">
         {(
           [
             { v: "list", label: "清單", icon: List },
@@ -121,7 +135,7 @@ export function RecordsToolbar({
         ).map(({ v, label, icon: Icon }) => (
           <button
             key={v}
-            onClick={() => setView(v)}
+            onClick={() => setView?.(v)}
             aria-pressed={view === v}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
               view === v ? "bg-emerald-700 text-white" : "text-stone-600 hover:bg-stone-100"
@@ -130,7 +144,7 @@ export function RecordsToolbar({
             <Icon size={15} /> {label}
           </button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

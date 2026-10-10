@@ -100,7 +100,8 @@ export function LaborTable({ kind, onEdit }: { kind: LaborKind; onEdit: (r: Labo
   );
 }
 
-export function LaborModal({ record, onClose }: { record: LaborRecord; onClose: () => void }) {
+/** code：打開前已驗證過的驗證碼（剪枝需要），儲存時送給後端 */
+export function LaborModal({ record, code, onClose }: { record: LaborRecord; code?: string; onClose: () => void }) {
   const db = useDB();
   const label = LABOR_LABEL[record.kind];
   // 舊紀錄沒有 note 欄位
@@ -136,7 +137,7 @@ export function LaborModal({ record, onClose }: { record: LaborRecord; onClose: 
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button onClick={() => { upsert("labor", r); onClose(); }}>儲存</Button>
+          <Button onClick={() => { upsert("labor", r, { code }); onClose(); }}>儲存</Button>
         </>
       }
     >

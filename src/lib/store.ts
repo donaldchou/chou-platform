@@ -108,6 +108,60 @@ export function useMe(): Me | null {
 /** 只有管理者可以新增、修改、刪除；一般使用者只能看 */
 export const useCanEdit = () => useMe()?.role === "admin";
 
+/* ---------------- 驗證碼解鎖（後台輸入一次，1 小時內免輸入） ---------------- */
+let unlockUntil: number | null = null; // 到期時間（毫秒）
+let unlockLoaded = false;
+const unlockListeners = new Set<() => void>();
+let unlockTimer: ReturnType<typeof setTimeout> | undefined;
+
+function setUnlock(expiresAt: number | null) {
+  unlockUntil = expiresAt && expiresAt > Date.now() ? expiresAt : null;
+  clearTimeout(unlockTimer);
+  // 到期時自動切回「需要驗證碼」
+  if (unlockUntil) unlockTimer = setTimeout(() => setUnlock(null), unlockUntil - Date.now());
+  unlockListeners.forEach((l) => l());
+}
+
+async function loadUnlock() {
+  unlockLoaded = true;
+  try {
+    setUnlock((await api<{ expiresAt: number | null }>("/api/unlock")).expiresAt);
+  } catch {
+    setUnlock(null);
+  }
+}
+
+/** 解鎖到期時間（毫秒）；沒有解鎖是 null */
+export function useUnlock(): number | null {
+  return useSyncExternalStore(
+    (l) => {
+      unlockListeners.add(l);
+      if (!unlockLoaded) void loadUnlock();
+      return () => unlockListeners.delete(l);
+    },
+    () => unlockUntil,
+    () => null,
+  );
+}
+
+/** 現在是否在解鎖期間（給非 React 的程式用） */
+export const isUnlocked = () => !!unlockUntil && unlockUntil > Date.now();
+
+export async function unlock(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { expiresAt } = await api<{ expiresAt: number }>("/api/unlock", { method: "POST", body: JSON.stringify({ code }) });
+    setUnlock(expiresAt);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function lock() {
+  await api("/api/unlock", { method: "DELETE" });
+  setUnlock(null);
+}
+
 export async function logout() {
   await fetch("/api/auth/logout", { method: "POST" });
   // 故意整頁重新載入，清掉記憶體裡的資料和登入身分
@@ -215,10 +269,11 @@ export async function verifyCode(
   action: "create" | "update" | "delete",
   code: string,
   category?: string,
+  kind?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (me?.role !== "admin") return { ok: false, error: READ_ONLY };
   try {
-    await api("/api/verify-code", { method: "POST", body: JSON.stringify({ collection, action, code, category }) });
+    await api("/api/verify-code", { method: "POST", body: JSON.stringify({ collection, action, code, category, kind }) });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

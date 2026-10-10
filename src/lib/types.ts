@@ -274,6 +274,28 @@ export interface LaborRecord {
   attendance: Attendance[];
   bentoMode: BentoMode;
   wages: LaborWage[];
+  note?: string; // 舊紀錄沒有這個欄位
+}
+
+/** 開花／結果／疏果紀錄：記錄各作物的起訖時間與當下照片 */
+export type PhenologyKind = "flowering" | "fruiting" | "thinning";
+
+export const PHENOLOGY_KINDS: Record<PhenologyKind, string> = {
+  flowering: "開花",
+  fruiting: "結果",
+  thinning: "疏果",
+};
+
+export interface PhenologyRecord {
+  id: ID;
+  kind: PhenologyKind;
+  orchardId: ID;
+  fruit: string; // 作物
+  variety: string; // 品種
+  start: string; // 開始日期 YYYY-MM-DD
+  end: string; // 結束日期，空白＝進行中
+  photos: string[];
+  note: string;
 }
 
 /** 種苗／嫁接／環剝紀錄：planting＝種苗種植、grafting＝嫁接、girdling＝環狀剝皮 */
@@ -375,6 +397,7 @@ export interface DB {
   fertilizing: FertilizingRecord[];
   spraying: SprayingRecord[];
   labor: LaborRecord[];
+  phenology: PhenologyRecord[];
   propagation: PropagationRecord[];
   tasks: Task[];
   salaries: Salary[];

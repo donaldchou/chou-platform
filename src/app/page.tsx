@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, Coins, Map, Sprout, Trees } from "lucide-react";
 import { useDB } from "@/lib/store";
-import { PROPAGATION_KINDS } from "@/lib/types";
+import { PHENOLOGY_KINDS, PROPAGATION_KINDS } from "@/lib/types";
 import { Badge, Card, PageHeader, StatCard } from "@/components/ui";
 import {
   contractStatus,
@@ -51,6 +51,7 @@ export default function Dashboard() {
       orchardId: r.orchardId,
       href: r.kind === "pruning" ? "/records/pruning" : "/records/weeding",
     })),
+    ...db.phenology.map((r) => ({ at: r.start, type: PHENOLOGY_KINDS[r.kind], orchardId: r.orchardId, href: "/records/pruning" })),
     ...db.bagging.map((r) => ({ at: r.start, type: "套袋", orchardId: r.orchardId, href: "/records/bagging" })),
     ...db.harvests.map((r) => ({ at: r.start, type: "採收", orchardId: r.orchardId, href: "/records/harvest" })),
     ...db.propagation.map((r) => ({

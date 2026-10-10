@@ -49,7 +49,7 @@ const NAV = [
       { href: "/records/harvest", label: "採收紀錄", icon: Apple },
       { href: "/records/fertilizing", label: "施肥紀錄", icon: Sprout },
       { href: "/records/spraying", label: "噴藥紀錄", icon: SprayCan },
-      { href: "/records/pruning", label: "剪枝紀錄", icon: Scissors },
+      { href: "/records/pruning", label: "剪枝/開花/結果/疏果紀錄", icon: Scissors },
       { href: "/records/weeding", label: "砍草紀錄", icon: Axe },
       { href: "/records/propagation", label: "種苗/嫁接/環剝", icon: Shovel },
     ],

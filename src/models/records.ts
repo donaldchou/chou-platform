@@ -138,6 +138,20 @@ const LaborSchema = new Schema({
     type: [new Schema({ id: idField, name: str, days: money, dailyRate: money, bentoDays: money }, sub)],
     default: [],
   },
+  note: str,
+});
+
+/** 開花／結果／疏果紀錄（kind 區分） */
+const PhenologySchema = new Schema({
+  _id: idField,
+  kind: { type: String, enum: ["flowering", "fruiting", "thinning"], required: true, index: true },
+  orchardId: orchardRef,
+  fruit: str, // 作物
+  variety: str, // 品種
+  start: ymd,
+  end: ymd, // 空白＝進行中
+  photos,
+  note: str,
 });
 
 /** 種苗／嫁接／環剝紀錄（kind 區分） */
@@ -166,4 +180,5 @@ export const HarvestModel = defineModel("Harvest", HarvestSchema, "harvests");
 export const FertilizingModel = defineModel("Fertilizing", FertilizingSchema, "fertilizing");
 export const SprayingModel = defineModel("Spraying", SprayingSchema, "spraying");
 export const LaborModel = defineModel("Labor", LaborSchema, "labor");
+export const PhenologyModel = defineModel("Phenology", PhenologySchema, "phenology");
 export const PropagationModel = defineModel("Propagation", PropagationSchema, "propagation");

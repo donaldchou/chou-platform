@@ -306,6 +306,7 @@ const COLL_LABEL: Record<Coll, string> = {
   fertilizing: "施肥紀錄",
   spraying: "噴藥紀錄",
   labor: "剪枝／砍草紀錄",
+  phenology: "開花／結果／疏果紀錄",
   propagation: "種苗／嫁接／環剝紀錄",
   tasks: "工作指派",
   salaries: "薪資",

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, Wand2 } from "lucide-react";
 import { remove, upsert, useDB } from "@/lib/store";
-import type { LaborKind, LaborRecord } from "@/lib/types";
+import type { DB, LaborKind, LaborRecord } from "@/lib/types";
 import { BENTO_PRICE, attendanceDays, daySpan, defaultOrchard, money, todayStr, uid } from "@/lib/utils";
 import {
   AttendanceEditor,
@@ -28,35 +28,55 @@ import {
   Select,
   Table,
   Td,
+  Textarea,
 } from "./ui";
 
-const META: Record<LaborKind, string> = { pruning: "剪枝", weeding: "砍草" };
+export const LABOR_LABEL: Record<LaborKind, string> = { pruning: "剪枝", weeding: "砍草" };
 
-const total = (r: LaborRecord) =>
+export const laborTotal = (r: LaborRecord) =>
   r.wages.reduce((s, w) => s + w.days * w.dailyRate + w.bentoDays * BENTO_PRICE, 0);
+
+export const newLaborRecord = (kind: LaborKind, db: DB): LaborRecord => ({
+  id: uid(), kind, orchardId: defaultOrchard(db.orchards)?.id ?? "", start: todayStr(), end: "",
+  employeeIds: [], workers: [], attendance: [], bentoMode: "便當", wages: [], note: "",
+});
+
+/** 今年累計工資的說明文字 */
+export function laborDesc(kind: LaborKind, db: DB) {
+  const label = LABOR_LABEL[kind];
+  const year = todayStr().slice(0, 4);
+  const yearCost = db.labor
+    .filter((r) => r.kind === kind && r.start.startsWith(year))
+    .reduce((s, r) => s + laborTotal(r), 0);
+  return `記錄${label}工期、參與人員、外請工人進場時間與工資結算。${year} 年累計工資 ${money(yearCost)}。`;
+}
 
 export function LaborPage({ kind }: { kind: LaborKind }) {
   const db = useDB();
-  const label = META[kind];
+  const label = LABOR_LABEL[kind];
   const [editing, setEditing] = useState<LaborRecord | null>(null);
-  const list = db.labor.filter((r) => r.kind === kind).sort((a, b) => b.start.localeCompare(a.start));
-  const orchard = (id: string) => db.orchards.find((o) => o.id === id);
-  const year = todayStr().slice(0, 4);
-  const yearCost = list.filter((r) => r.start.startsWith(year)).reduce((s, r) => s + total(r), 0);
-
-  const create = (): LaborRecord => ({
-    id: uid(), kind, orchardId: defaultOrchard(db.orchards)?.id ?? "", start: todayStr(), end: "",
-    employeeIds: [], workers: [], attendance: [], bentoMode: "便當", wages: [],
-  });
 
   return (
     <>
       <PageHeader
         title={`${label}紀錄`}
-        desc={`記錄${label}工期、參與人員、外請工人進場時間與工資結算。${year} 年累計工資 ${money(yearCost)}。`}
-        action={<Button onClick={() => setEditing(create())}><Plus size={16} /> 新增{label}紀錄</Button>}
+        desc={laborDesc(kind, db)}
+        action={<Button onClick={() => setEditing(newLaborRecord(kind, db))}><Plus size={16} /> 新增{label}紀錄</Button>}
       />
-      <Table head={["果園", "開始日期", "完工日期", "工期", "自己員工", "外請工人", "工資合計", ""]}>
+      <LaborTable kind={kind} onEdit={setEditing} />
+      {editing && <LaborModal record={editing} onClose={() => setEditing(null)} />}
+    </>
+  );
+}
+
+export function LaborTable({ kind, onEdit }: { kind: LaborKind; onEdit: (r: LaborRecord) => void }) {
+  const db = useDB();
+  const label = LABOR_LABEL[kind];
+  const list = db.labor.filter((r) => r.kind === kind).sort((a, b) => b.start.localeCompare(a.start));
+  const orchard = (id: string) => db.orchards.find((o) => o.id === id);
+
+  return (
+      <Table head={["果園", "開始日期", "完工日期", "工期", "自己員工", "外請工人", "工資合計", "備註", ""]}>
         {list.map((r) => (
           <tr key={r.id} className="hover:bg-stone-50">
             <Td>
@@ -68,22 +88,23 @@ export function LaborPage({ kind }: { kind: LaborKind }) {
             <Td>{r.end ? `${daySpan(r.start, r.end)} 天` : "—"}</Td>
             <Td>{r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}</Td>
             <Td>{r.workers.map((w) => db.workers.find((x) => x.id === w.workerId)?.nameZh).filter(Boolean).join("、") || "—"}</Td>
-            <Td className="font-semibold">{money(total(r))}</Td>
-            <Td><RowActions onEdit={() => setEditing(r)} onDelete={() => remove("labor", r.id)} /></Td>
+            <Td className="font-semibold">{money(laborTotal(r))}</Td>
+            <Td className="text-stone-500">{r.note}</Td>
+            <Td><RowActions onEdit={() => onEdit(r)} onDelete={() => remove("labor", r.id)} /></Td>
           </tr>
         ))}
         {!list.length && (
-          <tr><Td colSpan={8} className="py-8 text-center text-stone-400">尚無{label}紀錄</Td></tr>
+          <tr><Td colSpan={9} className="py-8 text-center text-stone-400">尚無{label}紀錄</Td></tr>
         )}
       </Table>
-      {editing && <LaborModal record={editing} label={label} onClose={() => setEditing(null)} />}
-    </>
   );
 }
 
-function LaborModal({ record, label, onClose }: { record: LaborRecord; label: string; onClose: () => void }) {
+export function LaborModal({ record, onClose }: { record: LaborRecord; onClose: () => void }) {
   const db = useDB();
-  const [r, setR] = useState(record);
+  const label = LABOR_LABEL[record.kind];
+  // 舊紀錄沒有 note 欄位
+  const [r, setR] = useState({ ...record, note: record.note ?? "" });
   const set = <K extends keyof LaborRecord>(k: K, v: LaborRecord[K]) => setR((p) => ({ ...p, [k]: v }));
   const workerName = (id: string) => db.workers.find((w) => w.id === id)?.nameZh ?? "";
   const names = r.workers.map((w) => workerName(w.workerId)).filter(Boolean);
@@ -213,9 +234,12 @@ function LaborModal({ record, label, onClose }: { record: LaborRecord; label: st
           })}
         </EditorRows>
         <Formula>
-          總金額 = 天數 × 日金額 + 便當天數 × {BENTO_PRICE} 元　｜　全部工資合計 <b>{money(total(r))}</b>
+          總金額 = 天數 × 日金額 + 便當天數 × {BENTO_PRICE} 元　｜　全部工資合計 <b>{money(laborTotal(r))}</b>
         </Formula>
       </div>
+
+      <SectionTitle>備註</SectionTitle>
+      <Textarea value={r.note} onChange={(e) => set("note", e.target.value)} />
     </Modal>
   );
 }

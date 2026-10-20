@@ -48,6 +48,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     const code = await readCode(req.headers, user.id);
     await deleteDoc(name, id, req.nextUrl.searchParams.get("cascade") === "true", {
       beforeDelete: (existing) => assertCode(name, "delete", code, [existing]),
+      deletedBy: user.email,
     });
     return new NextResponse(null, { status: 204 });
   } catch (err) {

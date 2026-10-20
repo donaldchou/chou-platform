@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Eye, KeyRound, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { Eye, KeyRound, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useCodeGate } from "@/components/code-modal";
 import { UnlockPanel } from "@/components/unlock-panel";
 import {
@@ -19,13 +19,54 @@ import {
 import { reload, useDB, useMe } from "@/lib/store";
 import type { DB } from "@/lib/types";
 
-type Tab = "users" | "data";
+type Tab = "users" | "data" | "trash";
+
+/* ---------------- 目前分頁，記在這台電腦的瀏覽器（重新整理後保留） ---------------- */
+const TABS: Tab[] = ["users", "data", "trash"];
+const TAB_KEY = "chou-admin-tab";
+const tabListeners = new Set<() => void>();
+let memoryTab: Tab | null = null;
+
+function readTab(): Tab {
+  if (memoryTab) return memoryTab;
+  try {
+    const v = localStorage.getItem(TAB_KEY) as Tab;
+    return TABS.includes(v) ? v : "users";
+  } catch {
+    return "users";
+  }
+}
+
+function writeTab(v: Tab) {
+  try {
+    localStorage.setItem(TAB_KEY, v);
+  } catch {
+    // 無法儲存（例如無痕模式）時，只在這次瀏覽有效
+  }
+  memoryTab = v;
+  tabListeners.forEach((l) => l());
+}
+
+function useTab(): [Tab, (v: Tab) => void] {
+  const tab = useSyncExternalStore(
+    (l) => {
+      tabListeners.add(l);
+      return () => tabListeners.delete(l);
+    },
+    readTab,
+    () => "users" as Tab,
+  );
+  return [tab, writeTab];
+}
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<Tab>("users");
+  const [tab, setTab] = useTab();
   return (
     <>
-      <PageHeader title="後台管理" desc="管理登入帳號，以及檢視、刪除資料庫裡的所有資料。只有管理者看得到這一頁。" />
+      <PageHeader
+        title="後台管理"
+        desc="管理登入帳號、檢視與刪除資料庫裡的所有資料，以及還原已刪除的噴藥／施肥紀錄。只有管理者看得到這一頁。"
+      />
       <UnlockPanel />
       <Tabs<Tab>
         value={tab}
@@ -33,9 +74,10 @@ export default function AdminPage() {
         tabs={[
           { value: "users", label: "使用者管理" },
           { value: "data", label: "所有資料" },
+          { value: "trash", label: "已刪除紀錄" },
         ]}
       />
-      {tab === "users" ? <UsersTab /> : <DataTab />}
+      {tab === "users" ? <UsersTab /> : tab === "data" ? <DataTab /> : <TrashTab />}
     </>
   );
 }
@@ -528,5 +570,137 @@ function DataTab() {
 
       {gate.dialog}
     </div>
+  );
+}
+
+/* ---------------- 已刪除紀錄（噴藥／施肥） ---------------- */
+type TrashColl = "spraying" | "fertilizing";
+type TrashItem = {
+  id: string;
+  collectionName: TrashColl;
+  docId: string;
+  data: Doc & { orchardId?: string; datetime?: string; items?: { materialId: string }[]; note?: string };
+  deletedAt: string;
+  deletedBy: string;
+};
+
+const TRASH_LABEL: Record<TrashColl, string> = { spraying: "噴藥紀錄", fertilizing: "施肥紀錄" };
+
+function TrashTab() {
+  const db = useDB();
+  const [items, setItems] = useState<TrashItem[] | null>(null);
+  const [error, setError] = useState("");
+  const [kind, setKind] = useState<"" | TrashColl>("");
+  const [viewing, setViewing] = useState<TrashItem | null>(null);
+  const gate = useCodeGate();
+
+  useEffect(() => {
+    call<TrashItem[]>("/api/admin/trash").then(setItems, (e) => setError(errMsg(e)));
+  }, []);
+
+  const list = (items ?? []).filter((t) => !kind || t.collectionName === kind);
+  const orchardName = (t: TrashItem) =>
+    db.orchards.find((o) => o.id === t.data.orchardId)?.nameZh ?? <span className="text-red-600">（果園已刪除）</span>;
+  const materials = (t: TrashItem) =>
+    (t.data.items ?? []).map((i) => db.materials.find((m) => m.id === i.materialId)?.nameZh ?? "（已刪除）").join("、") || "—";
+  const title = (t: TrashItem) => `${t.data.datetime?.replace("T", " ") ?? ""} 的${TRASH_LABEL[t.collectionName]}`;
+
+  function act(t: TrashItem, method: "POST" | "DELETE") {
+    const restore = method === "POST";
+    gate.ask({
+      title: restore ? "還原紀錄" : "永久刪除",
+      confirmLabel: restore ? "確認還原" : "確認永久刪除",
+      danger: !restore,
+      confirm: true,
+      message: restore ? (
+        <>即將還原 <b>{title(t)}</b>，還原後會回到原本的頁面。</>
+      ) : (
+        <>即將永久刪除 <b>{title(t)}</b> 的備份（連同照片），之後無法再還原。</>
+      ),
+      submit: async (code) => {
+        try {
+          await call(`/api/admin/trash/${encodeURIComponent(t.id)}`, { method, code });
+        } catch (e) {
+          return { ok: false, error: errMsg(e) };
+        }
+        setItems((l) => l?.filter((x) => x.id !== t.id) ?? null);
+        setViewing(null);
+        if (restore) await reload();
+        return { ok: true };
+      },
+    });
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-stone-500">
+          在噴藥紀錄、施肥紀錄頁刪除的資料會備份在這裡，可以還原或永久刪除。
+        </p>
+        <Select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className="!w-auto min-w-36" aria-label="類型">
+          <option value="">全部類型</option>
+          <option value="spraying">噴藥紀錄</option>
+          <option value="fertilizing">施肥紀錄</option>
+        </Select>
+      </div>
+      {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      <Table head={["類型", "施用日期時間", "果園", "配方", "刪除時間", "刪除者", ""]}>
+        {list.map((t) => (
+          <tr key={t.id} className="hover:bg-stone-50">
+            <Td className="whitespace-nowrap">
+              <Badge tone={t.collectionName === "spraying" ? "blue" : "amber"}>{TRASH_LABEL[t.collectionName]}</Badge>
+            </Td>
+            <Td className="whitespace-nowrap text-stone-800">{t.data.datetime?.replace("T", " ") || "—"}</Td>
+            <Td className="whitespace-nowrap font-medium text-stone-800">{orchardName(t)}</Td>
+            <Td className="text-xs text-stone-700">{materials(t)}</Td>
+            <Td className="whitespace-nowrap text-stone-500">{fmtTime(t.deletedAt)}</Td>
+            <Td className="whitespace-nowrap text-stone-500">{t.deletedBy || "—"}</Td>
+            <Td className="whitespace-nowrap text-right">
+              <Button size="sm" variant="ghost" onClick={() => setViewing(t)} title="檢視原始資料">
+                <Eye size={14} /> 檢視
+              </Button>
+              <Button size="sm" variant="ghost" className="text-emerald-700" onClick={() => act(t, "POST")} title="還原">
+                <RotateCcw size={14} /> 還原
+              </Button>
+              <Button size="sm" variant="ghost" className="text-red-600" onClick={() => act(t, "DELETE")} title="永久刪除">
+                <Trash2 size={14} />
+              </Button>
+            </Td>
+          </tr>
+        ))}
+        {!list.length && (
+          <tr>
+            <Td colSpan={7} className="py-8 text-center text-stone-400">
+              {items === null && !error ? "載入中…" : "沒有已刪除的紀錄"}
+            </Td>
+          </tr>
+        )}
+      </Table>
+
+      {viewing && (
+        <Modal
+          open
+          wide
+          onClose={() => setViewing(null)}
+          title={`已刪除：${title(viewing)}`}
+          footer={
+            <>
+              <Button variant="danger" className="mr-auto" onClick={() => act(viewing, "DELETE")}>
+                <Trash2 size={15} /> 永久刪除
+              </Button>
+              <Button variant="secondary" onClick={() => setViewing(null)}>關閉</Button>
+              <Button onClick={() => act(viewing, "POST")}>
+                <RotateCcw size={15} /> 還原
+              </Button>
+            </>
+          }
+        >
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-white p-4 font-mono text-xs text-stone-800 ring-1 ring-stone-200">
+            {JSON.stringify(viewing.data, null, 2)}
+          </pre>
+        </Modal>
+      )}
+      {gate.dialog}
+    </>
   );
 }

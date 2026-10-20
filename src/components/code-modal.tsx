@@ -11,6 +11,8 @@ interface CodeAsk {
   title: string;
   confirmLabel: string;
   danger?: boolean;
+  /** 解鎖期間也要顯示確認（不用輸入驗證碼），例如還原紀錄 */
+  confirm?: boolean;
   message: React.ReactNode;
   /** 檢查驗證碼並執行動作；成功時對話框會自動關閉 */
   submit: (code: string) => Promise<CodeResult>;
@@ -26,6 +28,7 @@ export function useCodeGate() {
       title={ask.title}
       confirmLabel={ask.confirmLabel}
       danger={ask.danger}
+      confirm={ask.confirm}
       onClose={() => {
         ask.onCancel?.();
         setAsk(null);
@@ -47,6 +50,7 @@ export function CodeModal({
   title,
   confirmLabel,
   danger = false,
+  confirm = false,
   onSubmit,
   onClose,
   children,
@@ -54,6 +58,7 @@ export function CodeModal({
   title: string;
   confirmLabel: string;
   danger?: boolean;
+  confirm?: boolean;
   onSubmit: (code: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   onClose: () => void;
   children: React.ReactNode;
@@ -62,9 +67,9 @@ export function CodeModal({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // 後台解鎖期間不用輸入驗證碼（後端會用解鎖 cookie 放行）：
-  // 一般操作直接送出、不顯示對話框；刪除仍顯示確認，只是不用輸入。失敗（例如剛好到期）才改回輸入。
+  // 一般操作直接送出、不顯示對話框；刪除（或指定 confirm）仍顯示確認，只是不用輸入。失敗（例如剛好到期）才改回輸入。
   const [skip, setSkip] = useState(isUnlocked);
-  const auto = skip && !danger;
+  const auto = skip && !danger && !confirm;
 
   const onSubmitRef = useRef(onSubmit);
   const started = useRef(false); // 開發模式 effect 會跑兩次，避免重複送出

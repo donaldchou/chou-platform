@@ -8,6 +8,7 @@ import type { DB } from "./types";
 import { OrchardModel } from "@/models/orchard";
 import { EmployeeModel } from "@/models/people";
 import { MaterialModel, StockModel } from "@/models/supply";
+import { TRASH_COLLECTIONS, TrashModel, type TrashCollection } from "@/models/trash";
 import { onlyChanged } from "./codes";
 
 type Data = Record<string, unknown>;
@@ -129,19 +130,26 @@ export async function saveDoc(
   return { doc: toClient(doc.toObject()), created: false };
 }
 
-/** 刪除。果園底下還有紀錄時回 409，帶 cascade=true 才會一併刪除 */
+const isTrashCollection = (name: string): name is TrashCollection => (TRASH_COLLECTIONS as readonly string[]).includes(name);
+
+/**
+ * 刪除。果園底下還有紀錄時回 409，帶 cascade=true 才會一併刪除。
+ * 噴藥／施肥紀錄會先備份到 trash（照片也先保留），後台可以還原。
+ */
 export async function deleteDoc(
   name: CollectionName,
   id: string,
   cascade: boolean,
-  opts: { beforeDelete?: (existing: Data) => void } = {},
+  opts: { beforeDelete?: (existing: Data) => void; deletedBy?: string } = {},
 ) {
   await connectDB();
   const Model = COLLECTIONS[name];
   const existing = await Model.findById(id).lean();
   if (!existing) throw new HttpError(404, "找不到資料");
   opts.beforeDelete?.(existing as Data); // 例如檢查刪除用的驗證碼
-  const photos = collectBlobUrls(existing);
+  const backup = isTrashCollection(name);
+  if (backup) await TrashModel.create({ collectionName: name, docId: id, data: existing, deletedBy: opts.deletedBy ?? "" });
+  const photos = backup ? new Set<string>() : collectBlobUrls(existing);
 
   if (name === "orchards") {
     const counts = Object.fromEntries(
@@ -166,6 +174,41 @@ export async function deleteDoc(
 
   await Model.deleteOne({ _id: id });
   await deleteBlobs(photos);
+}
+
+/* ---------------- 已刪除紀錄（trash） ---------------- */
+
+/** 已刪除的噴藥／施肥紀錄，最近刪除的在前 */
+export async function listTrash() {
+  await connectDB();
+  const docs = (await TrashModel.find().sort({ deletedAt: -1 }).lean()) as Data[];
+  return docs.map((d) => ({ ...toClient(d), data: toClient(d.data) }));
+}
+
+async function findTrash(id: string) {
+  const t = (await TrashModel.findById(id).lean()) as (Data & { collectionName: TrashCollection; docId: string; data: Data }) | null;
+  if (!t) throw new HttpError(404, "找不到這筆已刪除的紀錄");
+  return t;
+}
+
+/** 還原：原樣寫回原本的集合（id 不變），成功後移除備份 */
+export async function restoreTrash(id: string) {
+  await connectDB();
+  const t = await findTrash(id);
+  const Model = COLLECTIONS[t.collectionName];
+  if (await Model.exists({ _id: t.docId })) throw new HttpError(409, "這筆紀錄已經存在，不需要還原");
+  const data = fromClient(t.data);
+  await checkRefs(t.collectionName, data); // 果園被刪掉時無法還原
+  await Model.create({ ...data, _id: t.docId });
+  await TrashModel.deleteOne({ _id: id });
+}
+
+/** 永久刪除備份，這時才刪掉照片 */
+export async function purgeTrash(id: string) {
+  await connectDB();
+  const t = await findTrash(id);
+  await TrashModel.deleteOne({ _id: id });
+  await deleteBlobs(collectBlobUrls(t.data));
 }
 
 /** 一次取得全部資料（前端啟動時載入） */

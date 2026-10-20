@@ -55,7 +55,10 @@ export function addDays(datetime: string, days: number) {
 /** 預約下次噴藥用的農藥名稱：配方裡有這項的噴藥紀錄就是預約紀錄 */
 export const RESERVE_MATERIAL = "預約紀錄";
 
-export const isReservation = (r: { items: { materialId: string }[] }, materials: Material[]) =>
+/** 資材沒填價格（費用會算成 0）；已刪除的資材、預約紀錄標記不算 */
+export const missingPrice = (m?: Material) => !!m && !(m.price > 0) && m.nameZh !== RESERVE_MATERIAL;
+
+export const isReservation =(r: { items: { materialId: string }[] }, materials: Material[]) =>
   r.items.some((i) => materials.find((m) => m.id === i.materialId)?.nameZh === RESERVE_MATERIAL);
 
 export function daysUntil(date: string) {

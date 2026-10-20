@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Printer, Share2 } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { FertilizingRecord } from "@/lib/types";
-import { cardPhotoOf, defaultOrchard, fertPacks, fertUnit, fmtDT, money, todayStr, uid } from "@/lib/utils";
+import { cardPhotoOf, defaultOrchard, fertPacks, fertUnit, fmtDT, missingPrice, money, todayStr, uid } from "@/lib/utils";
 import { useFertCost } from "@/components/fert-modal";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
@@ -50,7 +50,20 @@ export default function FertilizingPage() {
                 <tr key={r.id} className="hover:bg-stone-50">
                   <Td className="whitespace-nowrap">{fmtDT(r.datetime)}</Td>
                   <Td className="whitespace-nowrap font-medium">{db.orchards.find((o) => o.id === r.orchardId)?.nameZh ?? "—"}</Td>
-                  <Td>{r.items.map((i) => mat(i.materialId)?.nameZh ?? "（已刪除）").join("、") || "—"}</Td>
+                  <Td>
+                    {r.items.length
+                      ? r.items.map((i, n) => {
+                          const m = mat(i.materialId);
+                          return (
+                            <span key={i.id}>
+                              {n > 0 && "、"}
+                              {m?.nameZh ?? "（已刪除）"}
+                              {missingPrice(m) && <span className="ml-1 text-xs font-medium text-red-600">[缺價格]</span>}
+                            </span>
+                          );
+                        })
+                      : "—"}
+                  </Td>
                   <Td>{targetsText(r.targets, r.otherTarget)}</Td>
                   <Td>{c.packs} 包</Td>
                   <Td className="whitespace-nowrap font-semibold">{money(c.cost)}</Td>

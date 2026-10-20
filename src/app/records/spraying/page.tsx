@@ -9,7 +9,7 @@ import { Button, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } fr
 import { STAGES } from "@/lib/spray-advice";
 import { useDB } from "@/lib/store";
 import type { SprayingRecord } from "@/lib/types";
-import { cardPhotoOf, defaultOrchard, fmtDT, isReservation, materialCost, money, nowStr, uid } from "@/lib/utils";
+import { cardPhotoOf, defaultOrchard, fmtDT, isReservation, materialCost, missingPrice, money, todayStr, uid } from "@/lib/utils";
 
 export default function SprayingPage() {
   const db = useDB();
@@ -24,8 +24,9 @@ export default function SprayingPage() {
   const cost = (r: SprayingRecord) => r.items.reduce((s, i) => s + materialCost(mat(i.materialId), i.amount), 0);
   const open = (record: SprayingRecord) => ({ kind: "spraying" as const, record });
 
+  // 新增時日期預設今天、時間一律早上 07:00
   const create = (): SprayingRecord => ({
-    id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", datetime: nowStr(), waterLiters: 500, items: [], targets: [],
+    id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", datetime: `${todayStr()}T07:00`, waterLiters: 500, items: [], targets: [],
     otherTarget: "", stage: STAGES[3], aiSuggestion: "", employeeIds: [], note: "",
   });
 
@@ -53,11 +54,15 @@ export default function SprayingPage() {
                   <Td className="whitespace-nowrap">{r.waterLiters} L</Td>
                   <Td className={red}>
                     <ol className="space-y-0.5">
-                      {r.items.map((i, n) => (
-                        <li key={i.id} className="text-xs">
-                          {n + 1}. {mat(i.materialId)?.nameZh ?? "（已刪除）"} {i.amount}{i.unit}
-                        </li>
-                      ))}
+                      {r.items.map((i, n) => {
+                        const m = mat(i.materialId);
+                        return (
+                          <li key={i.id} className="text-xs">
+                            {n + 1}. {m?.nameZh ?? "（已刪除）"} {i.amount}{i.unit}
+                            {missingPrice(m) && <span className="ml-1 font-medium text-red-600">[缺價格]</span>}
+                          </li>
+                        );
+                      })}
                     </ol>
                   </Td>
                   <Td className={red}>{targetsText(r.targets, r.otherTarget)}</Td>

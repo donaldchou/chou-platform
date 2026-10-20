@@ -76,6 +76,20 @@ const sorted = (days: Map<string, Day>) => [...days.values()].sort((a, b) => a.d
 /** 1/11 這種月/日格式 */
 const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
+/** 用到這些資材（名稱包含這段文字）的日期，在日期後面加上簡稱，例如 3/28(亞) */
+const MARKERS = [
+  { name: "亞磷酸+氫氧化鉀", tag: "亞" },
+  { name: "新巨果", tag: "巨" },
+  { name: "花果露", tag: "花" },
+  { name: "大滅松", tag: "大" }, // 資材名稱是「達滅速 (大滅松)」
+  { name: "果霸", tag: "霸" },
+  { name: "果之露", tag: "露" },
+];
+const tagsOf = (d: Day) =>
+  MARKERS.filter((x) => d.entries.some((e) => e.name.includes(x.name)))
+    .map((x) => `(${x.tag})`)
+    .join("");
+
 /** 點日期時傳出可前後切換的紀錄（日曆：同一格；年曆：同一列）與點到的位置 */
 export type OnOpen = (list: OpenRecord[], index: number) => void;
 
@@ -304,6 +318,7 @@ function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) 
             className={`cursor-pointer rounded-md px-2 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${d.reserved ? RESERVED_TONE : TONE[d.tone]}`}
           >
             {md(d.date)}
+            {tagsOf(d)}
           </button>
         );
       })}

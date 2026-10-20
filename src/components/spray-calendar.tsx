@@ -126,7 +126,10 @@ export function SprayCalendar({
     const fert = new Map<string, Day>();
     for (const r of fertilizing) {
       if (r.orchardId !== orchardId || !coversFruit(r, fruit)) continue;
-      addDay(fert, "fert", r.datetime.slice(0, 10), r.items.map((i) => fertEntry(i, mat(i.materialId))), r);
+      // 預約紀錄的「預約紀錄」肥料只是標記，小視窗不列出
+      const reserved = isReservation(r, db.materials);
+      const entries = r.items.map((i) => fertEntry(i, mat(i.materialId))).filter((e) => !reserved || e.name !== RESERVE_MATERIAL);
+      addDay(fert, "fert", r.datetime.slice(0, 10), entries, r, reserved);
     }
     for (const r of spraying) {
       if (r.orchardId !== orchardId || !coversFruit(r, fruit)) continue;
@@ -162,7 +165,7 @@ export function SprayCalendar({
             <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-inset ring-amber-400" />肥料</span>
           </>
         )}
-        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-red-200 ring-1 ring-inset ring-red-400" />預約噴藥</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-red-200 ring-1 ring-inset ring-red-400" />預約噴藥／施肥</span>
         滑鼠移到日期上可看使用的藥品／肥料與倍數；點日期可開啟該筆噴藥／施肥紀錄。
         <label className="flex cursor-pointer items-center gap-1.5 text-stone-700">
           <input
@@ -281,7 +284,7 @@ const TONE: Record<Tone, string> = {
 };
 const RESERVED_TONE = "bg-red-100 text-red-700 ring-red-300 hover:bg-red-200";
 
-const dayLabel = (d: Day) => (d.reserved ? "預約噴藥" : d.tone === "pest" ? "噴藥" : "施肥");
+const dayLabel = (d: Day) => `${d.reserved ? "預約" : ""}${d.tone === "pest" ? "噴藥" : "施肥"}`;
 
 /** 一格裡的日期，點日期時呼叫 onPick */
 function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) => void; empty?: string }) {
@@ -349,7 +352,7 @@ function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) 
               ))}
             </ul>
           ) : (
-            <p className="text-stone-400">{tip.day.reserved ? "尚未決定藥品" : "未加入藥品"}</p>
+            <p className="text-stone-400">{tip.day.reserved ? (tip.day.tone === "pest" ? "尚未決定藥品" : "尚未決定肥料") : "未加入藥品"}</p>
           )}
         </div>
       )}

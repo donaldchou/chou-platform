@@ -16,9 +16,8 @@ import {
   RESERVE_MATERIAL,
   uid,
 } from "@/lib/utils";
-
-const WEEKDAYS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 import {
+  DateWithNext,
   DelBtn,
   EditorRows,
   EmployeePicker,
@@ -30,7 +29,6 @@ import {
 import {
   Button,
   Field,
-  Input,
   Modal,
   NumInput,
   SearchSelect,
@@ -99,7 +97,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
   function save() {
     let reservation: SprayingRecord | null = null;
     if (nextDays > 0 && nextDate) {
-      const m = db.materials.find((x) => x.nameZh === RESERVE_MATERIAL);
+      const m = pesticides.find((x) => x.nameZh === RESERVE_MATERIAL);
       if (!m) return alert(`請先在「農藥」頁面建立名稱為「${RESERVE_MATERIAL}」的農藥，才能預約下次噴藥。`);
       reservation = {
         id: uid(),
@@ -188,23 +186,14 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
           <NumInput value={r.waterLiters} onChange={(v) => set("waterLiters", v)} />
         </Field>
       </div>
-      <div className="mt-4 grid items-end gap-4 sm:grid-cols-[14rem_9rem_1fr]">
-        <Field label="施用日期時間">
-          <Input type="datetime-local" value={r.datetime} onChange={(e) => set("datetime", e.target.value)} />
-        </Field>
-        <Field label="預約下次噴藥（天後）">
-          <NumInput value={nextDays} onChange={(v) => setNextDays(Math.max(0, Math.round(v)))} />
-        </Field>
-        <p className="pb-2 text-sm">
-          {nextDays > 0 && nextDate ? (
-            <span className="text-red-700">
-              下次噴藥：<b>{fmtDT(nextDate)}</b>（{WEEKDAYS[new Date(nextDate).getDay()]}），儲存時會新增一筆預約紀錄
-            </span>
-          ) : (
-            <span className="text-stone-400">填入天數，儲存時會自動新增一筆預約噴藥紀錄</span>
-          )}
-        </p>
-      </div>
+      <DateWithNext
+        what="噴藥"
+        datetime={r.datetime}
+        onDatetime={(v) => set("datetime", v)}
+        days={nextDays}
+        onDays={setNextDays}
+        nextDate={nextDate}
+      />
 
       <SectionTitle>農藥／肥料（依加入順序）</SectionTitle>
       <EditorRows

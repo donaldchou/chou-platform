@@ -9,6 +9,48 @@ import { BAG_TYPES, BENTO_PRICE, bagsPerBox, hoursBetween, todayStr, uid } from 
 import { Button, ChipSelect, ComboInput, Field, Input, NumInput, SearchSelect, Select } from "./ui";
 
 /** 果園選單：可打字搜尋中文或英文名稱；使用中的果園排前面，已關閉的另成一群 */
+const WEEKDAYS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+
+/**
+ * 施用日期時間＋「預約下次○○（天後）」，右邊即時顯示下次日期。
+ * what：噴藥／施肥；nextDate 由呼叫端用 addDays 算好（儲存時用同一個日期建立預約紀錄）
+ */
+export function DateWithNext({
+  what,
+  datetime,
+  onDatetime,
+  days,
+  onDays,
+  nextDate,
+}: {
+  what: string;
+  datetime: string;
+  onDatetime: (v: string) => void;
+  days: number;
+  onDays: (v: number) => void;
+  nextDate: string;
+}) {
+  return (
+    <div className="mt-4 grid items-end gap-4 sm:grid-cols-[14rem_9rem_1fr]">
+      <Field label="施用日期時間">
+        <Input type="datetime-local" value={datetime} onChange={(e) => onDatetime(e.target.value)} />
+      </Field>
+      <Field label={`預約下次${what}（天後）`}>
+        <NumInput value={days} onChange={(v) => onDays(Math.max(0, Math.round(v)))} />
+      </Field>
+      <p className="pb-2 text-sm">
+        {days > 0 && nextDate ? (
+          <span className="text-red-700">
+            下次{what}：<b>{nextDate.replace("T", " ")}</b>（{WEEKDAYS[new Date(nextDate).getDay()]}），儲存時會新增一筆預約紀錄
+          </span>
+        ) : (
+          <span className="text-stone-400">填入天數，儲存時會自動新增一筆預約{what}紀錄</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
 export function OrchardSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const db = useDB();
   const option = (group: string, groupClass: string) => (o: Orchard) => ({

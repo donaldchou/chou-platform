@@ -5,8 +5,21 @@ import Link from "next/link";
 import { upsert, useDB } from "@/lib/store";
 import type { FertilizingRecord } from "@/lib/types";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { defaultOrchard, fertPacks, fertUnit, fmtDT, materialCost, materialName, money, orchardLabel, uid } from "@/lib/utils";
 import {
+  addDays,
+  defaultOrchard,
+  fertPacks,
+  fertUnit,
+  fmtDT,
+  materialCost,
+  materialName,
+  money,
+  orchardLabel,
+  RESERVE_MATERIAL,
+  uid,
+} from "@/lib/utils";
+import {
+  DateWithNext,
   DelBtn,
   EditorRows,
   EmployeePicker,
@@ -17,7 +30,6 @@ import {
 import {
   Button,
   Field,
-  Input,
   Modal,
   NumInput,
   PhotoUpload,
@@ -90,6 +102,33 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
     }));
   }
 
+  // 預約下次施肥：填幾天後，儲存時另外新增一筆肥料只有「預約紀錄」的施肥紀錄
+  const [nextDays, setNextDays] = useState(0);
+  const nextDate = addDays(r.datetime, nextDays);
+
+  function save() {
+    let reservation: FertilizingRecord | null = null;
+    if (nextDays > 0 && nextDate) {
+      const m = ferts.find((x) => x.nameZh === RESERVE_MATERIAL);
+      if (!m) return alert(`請先在「肥料」頁面建立名稱為「${RESERVE_MATERIAL}」的肥料，才能預約下次施肥。`);
+      reservation = {
+        id: uid(),
+        orchardId: r.orchardId,
+        datetime: nextDate,
+        waterLiters: 0,
+        items: [{ id: uid(), materialId: m.id, gramsPerTree: 0, litersPerTree: 0, seconds: 0, amount: 0 }],
+        targets: [...r.targets],
+        otherTarget: r.otherTarget,
+        employeeIds: [...r.employeeIds],
+        photos: [], // 照片不複製：同一張照片給兩筆紀錄用，永久刪除其中一筆時照片會被刪掉
+        note: `由 ${fmtDT(r.datetime)} 的施肥紀錄預約`,
+      };
+    }
+    upsert("fertilizing", r, { code });
+    if (reservation) upsert("fertilizing", reservation, { code });
+    onClose();
+  }
+
   function move(i: number, d: -1 | 1) {
     const items = [...r.items];
     [items[i], items[i + d]] = [items[i + d], items[i]];
@@ -105,7 +144,7 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button onClick={() => { upsert("fertilizing", r, { code }); onClose(); }}>儲存</Button>
+          <Button onClick={save}>儲存</Button>
         </>
       }
     >
@@ -139,15 +178,20 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
         <p className="mt-2 text-xs text-stone-500">帶入水量、肥料與用量、對象、人員與注意事項，帶入後可再手動調整；果園、日期與參考照片不會被覆蓋。</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-[2fr_0.7fr]">
         <OrchardSelect value={r.orchardId} onChange={(v) => set("orchardId", v)} />
-        <Field label="施用日期時間">
-          <Input type="datetime-local" value={r.datetime} onChange={(e) => set("datetime", e.target.value)} />
-        </Field>
         <Field label="水使用總量（公升 L）">
           <NumInput value={r.waterLiters ?? 0} onChange={(v) => set("waterLiters", v)} />
         </Field>
       </div>
+      <DateWithNext
+        what="施肥"
+        datetime={r.datetime}
+        onDatetime={(v) => set("datetime", v)}
+        days={nextDays}
+        onDays={setNextDays}
+        nextDate={nextDate}
+      />
 
       <SectionTitle>肥料使用</SectionTitle>
       {ferts.length === 0 ? (

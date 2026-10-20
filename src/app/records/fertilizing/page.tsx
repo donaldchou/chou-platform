@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Printer, Share2 } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { FertilizingRecord } from "@/lib/types";
-import { cardPhotoOf, defaultOrchard, fertPacks, fertUnit, fmtDT, missingPrice, money, todayStr, uid } from "@/lib/utils";
+import { cardPhotoOf, defaultOrchard, fertPacks, fertUnit, fmtDT, isReservation, missingPrice, money, todayStr, uid } from "@/lib/utils";
 import { useFertCost } from "@/components/fert-modal";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
@@ -46,11 +46,13 @@ export default function FertilizingPage() {
           <Table head={["施用日期時間", "果園", "肥料", "對象", "總包數", "費用", "員工", ""]}>
             {list.map((r) => {
               const c = cost(r);
+              // 預約下次施肥的紀錄整列紅字
+              const red = isReservation(r, db.materials) ? "text-red-700" : "";
               return (
-                <tr key={r.id} className="hover:bg-stone-50">
+                <tr key={r.id} className={`hover:bg-stone-50 ${red}`}>
                   <Td className="whitespace-nowrap">{fmtDT(r.datetime)}</Td>
                   <Td className="whitespace-nowrap font-medium">{db.orchards.find((o) => o.id === r.orchardId)?.nameZh ?? "—"}</Td>
-                  <Td>
+                  <Td className={red}>
                     {r.items.length
                       ? r.items.map((i, n) => {
                           const m = mat(i.materialId);
@@ -64,10 +66,10 @@ export default function FertilizingPage() {
                         })
                       : "—"}
                   </Td>
-                  <Td>{targetsText(r.targets, r.otherTarget)}</Td>
-                  <Td>{c.packs} 包</Td>
+                  <Td className={red}>{targetsText(r.targets, r.otherTarget)}</Td>
+                  <Td className={red}>{c.packs} 包</Td>
                   <Td className="whitespace-nowrap font-semibold">{money(c.cost)}</Td>
-                  <Td>{r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}</Td>
+                  <Td className={red}>{r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}</Td>
                   <Td>
                     <div className="flex items-center justify-end">
                       <Button size="sm" variant="ghost" className="text-emerald-700" onClick={() => setCard(r)} title="員工參考卡">

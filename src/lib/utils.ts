@@ -44,6 +44,20 @@ export const thisMonth = () => localISO(new Date()).slice(0, 7);
 
 export const fmtDT = (s: string) => (s ? s.replace("T", " ") : "—");
 
+/** YYYY-MM-DDTHH:mm 往後加幾天（時間不變）；格式不對時回傳空字串 */
+export function addDays(datetime: string, days: number) {
+  const d = new Date(datetime);
+  if (!datetime || isNaN(d.getTime())) return "";
+  d.setDate(d.getDate() + days);
+  return localISO(d).slice(0, 16);
+}
+
+/** 預約下次噴藥用的農藥名稱：配方裡有這項的噴藥紀錄就是預約紀錄 */
+export const RESERVE_MATERIAL = "預約紀錄";
+
+export const isReservation = (r: { items: { materialId: string }[] }, materials: Material[]) =>
+  r.items.some((i) => materials.find((m) => m.id === i.materialId)?.nameZh === RESERVE_MATERIAL);
+
 export function daysUntil(date: string) {
   if (!date) return Infinity;
   const ms = new Date(date + "T00:00:00").getTime() - new Date(todayStr() + "T00:00:00").getTime();

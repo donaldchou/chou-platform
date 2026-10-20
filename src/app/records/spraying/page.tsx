@@ -9,13 +9,13 @@ import { Button, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } fr
 import { STAGES } from "@/lib/spray-advice";
 import { useDB } from "@/lib/store";
 import type { SprayingRecord } from "@/lib/types";
-import { cardPhotoOf, defaultOrchard, fmtDT, materialCost, money, nowStr, uid } from "@/lib/utils";
+import { cardPhotoOf, defaultOrchard, fmtDT, isReservation, materialCost, money, nowStr, uid } from "@/lib/utils";
 
 export default function SprayingPage() {
   const db = useDB();
   const { edit, remove, dialogs } = useRecordActions();
   const [card, setCard] = useState<SprayingRecord | null>(null);
-  const filter = useRecordsFilter();
+  const filter = useRecordsFilter("spraying");
   const { year, view } = filter;
   const yearList = db.spraying.filter(filter.inYear);
   const list = yearList.filter(filter.matches).sort((a, b) => b.datetime.localeCompare(a.datetime));
@@ -43,33 +43,37 @@ export default function SprayingPage() {
         <>
           <RecordFilters {...filter} />
           <Table head={["施用日期時間", "果園", "用水量", "配方（加入順序）", "對象", "費用", "員工", ""]}>
-            {list.map((r) => (
-              <tr key={r.id} className="hover:bg-stone-50">
-                <Td className="whitespace-nowrap">{fmtDT(r.datetime)}</Td>
-                <Td className="whitespace-nowrap font-medium">{db.orchards.find((o) => o.id === r.orchardId)?.nameZh ?? "—"}</Td>
-                <Td className="whitespace-nowrap">{r.waterLiters} L</Td>
-                <Td>
-                  <ol className="space-y-0.5">
-                    {r.items.map((i, n) => (
-                      <li key={i.id} className="text-xs">
-                        {n + 1}. {mat(i.materialId)?.nameZh ?? "（已刪除）"} {i.amount}{i.unit}
-                      </li>
-                    ))}
-                  </ol>
-                </Td>
-                <Td>{targetsText(r.targets, r.otherTarget)}</Td>
-                <Td className="whitespace-nowrap font-semibold">{money(cost(r))}</Td>
-                <Td>{r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}</Td>
-                <Td>
-                  <div className="flex items-center justify-end">
-                    <Button size="sm" variant="ghost" className="text-emerald-700" onClick={() => setCard(r)} title="員工參考卡">
-                      <Share2 size={14} />
-                    </Button>
-                    <RowActions confirm={false} onEdit={() => edit(open(r))} onDelete={() => remove(open(r))} />
-                  </div>
-                </Td>
-              </tr>
-            ))}
+            {list.map((r) => {
+              // 預約下次噴藥的紀錄整列紅字
+              const red = isReservation(r, db.materials) ? "text-red-700" : "";
+              return (
+                <tr key={r.id} className={`hover:bg-stone-50 ${red}`}>
+                  <Td className="whitespace-nowrap">{fmtDT(r.datetime)}</Td>
+                  <Td className="whitespace-nowrap font-medium">{db.orchards.find((o) => o.id === r.orchardId)?.nameZh ?? "—"}</Td>
+                  <Td className="whitespace-nowrap">{r.waterLiters} L</Td>
+                  <Td className={red}>
+                    <ol className="space-y-0.5">
+                      {r.items.map((i, n) => (
+                        <li key={i.id} className="text-xs">
+                          {n + 1}. {mat(i.materialId)?.nameZh ?? "（已刪除）"} {i.amount}{i.unit}
+                        </li>
+                      ))}
+                    </ol>
+                  </Td>
+                  <Td className={red}>{targetsText(r.targets, r.otherTarget)}</Td>
+                  <Td className="whitespace-nowrap font-semibold">{money(cost(r))}</Td>
+                  <Td className={red}>{r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}</Td>
+                  <Td>
+                    <div className="flex items-center justify-end">
+                      <Button size="sm" variant="ghost" className="text-emerald-700" onClick={() => setCard(r)} title="員工參考卡">
+                        <Share2 size={14} />
+                      </Button>
+                      <RowActions confirm={false} onEdit={() => edit(open(r))} onDelete={() => remove(open(r))} />
+                    </div>
+                  </Td>
+                </tr>
+              );
+            })}
             {!list.length && (
               <tr>
                 <Td colSpan={8} className="py-8 text-center text-stone-400">

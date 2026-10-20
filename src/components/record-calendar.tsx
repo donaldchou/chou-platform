@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, List, Search, X } from "lucide-react";
 import { useDB } from "@/lib/store";
 import { FRUITS, type FertilizingRecord, type SprayingRecord } from "@/lib/types";
@@ -16,11 +16,50 @@ type Rec = SprayingRecord | FertilizingRecord;
 
 const splitOther = (s: string) => s.split(/[、,，\s]+/).filter(Boolean);
 
+/* ---------------- 顯示方式（清單／日曆／年曆），每個頁面各自記在這台電腦的瀏覽器 ---------------- */
+const VIEWS: RecordsView[] = ["list", "calendar", "month"];
+const viewKey = (page: string) => `chou-${page}-view`;
+const viewListeners = new Set<() => void>();
+const memoryViews = new Map<string, RecordsView>();
+
+function readView(page: string): RecordsView {
+  const saved = memoryViews.get(page);
+  if (saved) return saved;
+  try {
+    const v = localStorage.getItem(viewKey(page)) as RecordsView;
+    return VIEWS.includes(v) ? v : "list";
+  } catch {
+    return "list";
+  }
+}
+
+function writeView(page: string, v: RecordsView) {
+  try {
+    localStorage.setItem(viewKey(page), v);
+  } catch {
+    // 無法儲存（例如無痕模式）時，只在這次瀏覽有效
+  }
+  memoryViews.set(page, v);
+  viewListeners.forEach((l) => l());
+}
+
+function useSavedView(page: string): [RecordsView, (v: RecordsView) => void] {
+  const view = useSyncExternalStore(
+    (l) => {
+      viewListeners.add(l);
+      return () => viewListeners.delete(l);
+    },
+    () => readView(page),
+    () => "list" as RecordsView,
+  );
+  return [view, (v) => writeView(page, v)];
+}
+
 /**
- * 噴藥／施肥紀錄頁共用：年度（清單和日曆一起連動）、顯示方式，
+ * 噴藥／施肥紀錄頁共用：年度（清單和日曆一起連動）、顯示方式（重新整理後保留），
  * 以及清單的篩選（關鍵字、果園、對象、員工）。
  */
-export function useRecordsFilter() {
+export function useRecordsFilter(page: "spraying" | "fertilizing") {
   const db = useDB();
   const thisYear = new Date().getFullYear();
   const dataYears = [...db.spraying, ...db.fertilizing].map((r) => Number(r.datetime.slice(0, 4))).filter(Boolean);
@@ -29,7 +68,7 @@ export function useRecordsFilter() {
   // 上年度／下年度可以走到最早有資料的年度，往後最多到今年
   const minYear = Math.min(...years);
   const maxYear = Math.max(thisYear, ...dataYears);
-  const [view, setView] = useState<RecordsView>("list");
+  const [view, setView] = useSavedView(page);
   const inYear = (r: { datetime: string }) => r.datetime.startsWith(String(year));
 
   const [q, setQ] = useState("");

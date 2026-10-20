@@ -17,7 +17,7 @@ export default function FertilizingPage() {
   const { edit, remove, dialogs } = useRecordActions();
   const [card, setCard] = useState<FertilizingRecord | null>(null);
   const open = (record: FertilizingRecord) => ({ kind: "fertilizing" as const, record });
-  const filter = useRecordsFilter();
+  const filter = useRecordsFilter("fertilizing");
   const { year, view } = filter;
   const yearList = db.fertilizing.filter(filter.inYear);
   const list = yearList.filter(filter.matches).sort((a, b) => b.datetime.localeCompare(a.datetime));

@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { useDB } from "@/lib/store";
 import { FRUITS, type FertilizingRecord, type Material, type Orchard, type SprayingRecord } from "@/lib/types";
+import { isReservation, RESERVE_MATERIAL } from "@/lib/utils";
 
 type Rec = SprayingRecord | FertilizingRecord;
 
 /** 使用的藥品／肥料與倍數；fert＝噴藥紀錄裡的肥料（葉面肥） */
 type Entry = { name: string; rate: string; fert?: boolean };
 
-/** 同一天的施用（可能有好幾筆紀錄，點日期時開啟第一筆）；targets＝這幾筆紀錄的對象 */
-type Day = { date: string; tone: Tone; entries: Entry[]; targets: string[]; record?: Rec };
+/**
+ * 同一天的施用（可能有好幾筆紀錄，點日期時開啟第一筆）；targets＝這幾筆紀錄的對象，
+ * reserved＝這天全部都是預約下次噴藥的紀錄（紅色顯示）
+ */
+type Day = { date: string; tone: Tone; entries: Entry[]; targets: string[]; reserved: boolean; record?: Rec };
 
 /** pest＝農藥日期（藍）、fert＝肥料日期（橘） */
 export type Tone = "pest" | "fert";
@@ -56,8 +60,9 @@ function fertEntry(item: FertilizingRecord["items"][number], m?: Material): Entr
 
 const targetsOf = (r: Rec) => [...r.targets, ...r.otherTarget.split(/[、,，\s]+/).filter(Boolean)];
 
-function addDay(days: Map<string, Day>, tone: Tone, date: string, entries: Entry[], record: Rec) {
-  const d = days.get(date) ?? { date, tone, entries: [], targets: [] };
+function addDay(days: Map<string, Day>, tone: Tone, date: string, entries: Entry[], record: Rec, reserved = false) {
+  const d = days.get(date) ?? { date, tone, entries: [], targets: [], reserved };
+  d.reserved &&= reserved;
   for (const e of entries) {
     if (!d.entries.some((x) => x.name === e.name && x.rate === e.rate)) d.entries.push(e);
   }
@@ -118,8 +123,11 @@ export function SprayCalendar({
       });
       const p = used.filter((u) => u.m.category === "pesticide").map((u) => u.e);
       const f = used.filter((u) => u.m.category === "fertilizer").map((u) => ({ ...u.e, fert: true }));
+      // 預約紀錄的「預約紀錄」農藥只是標記，小視窗不列出
+      const reserved = isReservation(r, db.materials);
+      const shown = reserved ? p.filter((e) => e.name !== RESERVE_MATERIAL) : p;
       // 一筆噴藥紀錄只顯示一個噴藥日期，小視窗裡農藥、葉面肥一起列出
-      addDay(pest, "pest", date, [...p, ...f], r);
+      addDay(pest, "pest", date, [...shown, ...f], r, reserved);
     }
     return { pest: sorted(pest), fert: sorted(fert) };
   }
@@ -140,6 +148,7 @@ export function SprayCalendar({
             <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-amber-200 ring-1 ring-inset ring-amber-400" />肥料</span>
           </>
         )}
+        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-red-200 ring-1 ring-inset ring-red-400" />預約噴藥</span>
         滑鼠移到日期上可看使用的藥品／肥料與倍數；點日期可開啟該筆噴藥／施肥紀錄。
         <label className="flex cursor-pointer items-center gap-1.5 text-stone-700">
           <input
@@ -256,6 +265,9 @@ const TONE: Record<Tone, string> = {
   pest: "bg-sky-50 text-sky-800 ring-sky-200 hover:bg-sky-100",
   fert: "bg-amber-50 text-amber-800 ring-amber-200 hover:bg-amber-100",
 };
+const RESERVED_TONE = "bg-red-100 text-red-700 ring-red-300 hover:bg-red-200";
+
+const dayLabel = (d: Day) => (d.reserved ? "預約噴藥" : d.tone === "pest" ? "噴藥" : "施肥");
 
 /** 一格裡的日期，點日期時呼叫 onPick */
 function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) => void; empty?: string }) {
@@ -288,8 +300,8 @@ function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) 
             onMouseLeave={() => setTip(null)}
             onFocus={(e) => show(d, e.currentTarget)}
             onBlur={() => setTip(null)}
-            aria-label={`${d.date} ${d.tone === "pest" ? "噴藥" : "施肥"}（對象：${d.targets.join("、") || "整個果園"}）：${d.entries.map((x) => `${x.name} ${x.rate}`).join("、") || "未加入藥品"}`}
-            className={`cursor-pointer rounded-md px-2 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${TONE[d.tone]}`}
+            aria-label={`${d.date} ${dayLabel(d)}（對象：${d.targets.join("、") || "整個果園"}）：${d.entries.map((x) => `${x.name} ${x.rate}`).join("、") || "未加入藥品"}`}
+            className={`cursor-pointer rounded-md px-2 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${d.reserved ? RESERVED_TONE : TONE[d.tone]}`}
           >
             {md(d.date)}
           </button>
@@ -304,7 +316,7 @@ function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) 
           }`}
         >
           <div className="mb-1.5 font-semibold text-stone-800">
-            {tip.day.date}　{tip.day.tone === "pest" ? "噴藥" : "施肥"}
+            {tip.day.date}　<span className={tip.day.reserved ? "text-red-700" : ""}>{dayLabel(tip.day)}</span>
             <span className="ml-2 font-normal text-stone-500">對象：{tip.day.targets.join("、") || "整個果園"}</span>
           </div>
           {tip.day.entries.length ? (
@@ -322,7 +334,7 @@ function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) 
               ))}
             </ul>
           ) : (
-            <p className="text-stone-400">未加入藥品</p>
+            <p className="text-stone-400">{tip.day.reserved ? "尚未決定藥品" : "未加入藥品"}</p>
           )}
         </div>
       )}

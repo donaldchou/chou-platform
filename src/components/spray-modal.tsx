@@ -5,7 +5,19 @@ import { AlertTriangle, ArrowDown, ArrowUp, Sparkles } from "lucide-react";
 import { fetchSprayAdvice, upsert, useDB } from "@/lib/store";
 import { STAGES } from "@/lib/spray-advice";
 import type { Material, SprayingRecord } from "@/lib/types";
-import { defaultOrchard, fmtDT, materialCost, materialName, money, orchardLabel, uid } from "@/lib/utils";
+import {
+  addDays,
+  defaultOrchard,
+  fmtDT,
+  materialCost,
+  materialName,
+  money,
+  orchardLabel,
+  RESERVE_MATERIAL,
+  uid,
+} from "@/lib/utils";
+
+const WEEKDAYS = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
 import {
   DelBtn,
   EditorRows,
@@ -80,6 +92,34 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
 
   const [aiNote, setAiNote] = useState("");
 
+  // 預約下次噴藥：填幾天後，儲存時另外新增一筆配方只有「預約紀錄」的噴藥紀錄
+  const [nextDays, setNextDays] = useState(0);
+  const nextDate = addDays(r.datetime, nextDays);
+
+  function save() {
+    let reservation: SprayingRecord | null = null;
+    if (nextDays > 0 && nextDate) {
+      const m = db.materials.find((x) => x.nameZh === RESERVE_MATERIAL);
+      if (!m) return alert(`請先在「農藥」頁面建立名稱為「${RESERVE_MATERIAL}」的農藥，才能預約下次噴藥。`);
+      reservation = {
+        id: uid(),
+        orchardId: r.orchardId,
+        datetime: nextDate,
+        waterLiters: 0,
+        items: [{ id: uid(), materialId: m.id, amount: 0, unit: m.unit === "ml" ? "cc" : "g" }],
+        targets: [...r.targets],
+        otherTarget: r.otherTarget,
+        stage: r.stage,
+        aiSuggestion: "",
+        employeeIds: [...r.employeeIds],
+        note: `由 ${fmtDT(r.datetime)} 的噴藥紀錄預約`,
+      };
+    }
+    upsert("spraying", r, { code });
+    if (reservation) upsert("spraying", reservation, { code });
+    onClose();
+  }
+
   async function askAI() {
     setThinking(true);
     setAiNote("");
@@ -108,7 +148,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>取消</Button>
-          <Button onClick={() => { upsert("spraying", r, { code }); onClose(); }}>儲存</Button>
+          <Button onClick={save}>儲存</Button>
         </>
       }
     >
@@ -142,14 +182,28 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
         <p className="mt-2 text-xs text-stone-500">帶入水量、配方、對象、人員與時間點，帶入後可再手動調整；果園與日期不會被覆蓋。</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-[2fr_0.9fr_0.7fr]">
+      <div className="grid gap-4 sm:grid-cols-[2fr_0.7fr]">
         <OrchardSelect value={r.orchardId} onChange={(v) => set("orchardId", v)} />
-        <Field label="施用日期時間">
-          <Input type="datetime-local" value={r.datetime} onChange={(e) => set("datetime", e.target.value)} />
-        </Field>
         <Field label="水使用總量（公升 L）">
           <NumInput value={r.waterLiters} onChange={(v) => set("waterLiters", v)} />
         </Field>
+      </div>
+      <div className="mt-4 grid items-end gap-4 sm:grid-cols-[14rem_9rem_1fr]">
+        <Field label="施用日期時間">
+          <Input type="datetime-local" value={r.datetime} onChange={(e) => set("datetime", e.target.value)} />
+        </Field>
+        <Field label="預約下次噴藥（天後）">
+          <NumInput value={nextDays} onChange={(v) => setNextDays(Math.max(0, Math.round(v)))} />
+        </Field>
+        <p className="pb-2 text-sm">
+          {nextDays > 0 && nextDate ? (
+            <span className="text-red-700">
+              下次噴藥：<b>{fmtDT(nextDate)}</b>（{WEEKDAYS[new Date(nextDate).getDay()]}），儲存時會新增一筆預約紀錄
+            </span>
+          ) : (
+            <span className="text-stone-400">填入天數，儲存時會自動新增一筆預約噴藥紀錄</span>
+          )}
+        </p>
       </div>
 
       <SectionTitle>農藥／肥料（依加入順序）</SectionTitle>

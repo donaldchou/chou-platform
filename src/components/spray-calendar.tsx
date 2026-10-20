@@ -6,28 +6,21 @@ import { FRUITS, type FertilizingRecord, type Material, type Orchard, type Spray
 
 type Rec = SprayingRecord | FertilizingRecord;
 
-/** 使用的藥品／肥料與倍數 */
-type Entry = { name: string; rate: string };
+/** 使用的藥品／肥料與倍數；fert＝噴藥紀錄裡的肥料（葉面肥） */
+type Entry = { name: string; rate: string; fert?: boolean };
 
-/** 同一天的施用（可能有好幾筆紀錄，點日期時開啟第一筆） */
-type Day = { date: string; tone: Tone; entries: Entry[]; record?: Rec };
+/** 同一天的施用（可能有好幾筆紀錄，點日期時開啟第一筆）；targets＝這幾筆紀錄的對象 */
+type Day = { date: string; tone: Tone; entries: Entry[]; targets: string[]; record?: Rec };
 
 /** pest＝農藥日期（藍）、fert＝肥料日期（橘） */
 export type Tone = "pest" | "fert";
 
 /**
- * 紀錄會出現在哪一種日期：噴藥紀錄有農藥（或還沒加藥品）算農藥、有肥料（葉面肥）算肥料；施肥紀錄算肥料。
- * 一筆噴藥紀錄可能兩種都算。
+ * 紀錄會出現在哪一種日期：噴藥紀錄（含葉面肥）算農藥，施肥紀錄算肥料。
  */
-export function tonesOf(r: Rec, category: (materialId: string) => string | undefined): Tone[] {
-  if (!("stage" in r)) return ["fert"];
-  const cats = r.items.map((i) => category(i.materialId));
-  const pest = cats.includes("pesticide");
-  const fert = cats.includes("fertilizer");
-  return [...(pest || !fert ? (["pest"] as const) : []), ...(fert ? (["fert"] as const) : [])];
-}
+export const toneOf = (r: Rec): Tone => ("stage" in r ? "pest" : "fert");
 
-/** 日曆：果園在中間、左農藥右肥料；月曆：果園在左、1～12 月各一欄 */
+/** 日曆：果園在中間、左農藥右肥料；年曆：果園在左、1～12 月各一欄 */
 export type CalendarLayout = "calendar" | "month";
 
 export type OpenRecord = { kind: "spraying"; record: SprayingRecord } | { kind: "fertilizing"; record: FertilizingRecord };
@@ -61,11 +54,14 @@ function fertEntry(item: FertilizingRecord["items"][number], m?: Material): Entr
   return { name: m?.nameZh ?? "（已刪除）", rate };
 }
 
+const targetsOf = (r: Rec) => [...r.targets, ...r.otherTarget.split(/[、,，\s]+/).filter(Boolean)];
+
 function addDay(days: Map<string, Day>, tone: Tone, date: string, entries: Entry[], record: Rec) {
-  const d = days.get(date) ?? { date, tone, entries: [] };
+  const d = days.get(date) ?? { date, tone, entries: [], targets: [] };
   for (const e of entries) {
     if (!d.entries.some((x) => x.name === e.name && x.rate === e.rate)) d.entries.push(e);
   }
+  for (const t of targetsOf(record)) if (!d.targets.includes(t)) d.targets.push(t);
   d.record ??= record;
   days.set(date, d);
 }
@@ -75,16 +71,16 @@ const sorted = (days: Map<string, Day>) => [...days.values()].sort((a, b) => a.d
 /** 1/11 這種月/日格式 */
 const md = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
-/** 點日期時傳出可前後切換的紀錄（日曆：同一格；月曆：同一列）與點到的位置 */
+/** 點日期時傳出可前後切換的紀錄（日曆：同一格；年曆：同一列）與點到的位置 */
 export type OnOpen = (list: OpenRecord[], index: number) => void;
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 /**
  * 噴藥、施肥日期對照表，依果樹種類分組列出果園。
- * 噴藥紀錄裡有農藥就算農藥日期、有肥料（葉面肥）就算肥料日期；施肥紀錄都算肥料日期。
+ * 噴藥紀錄都算農藥日期（葉面肥列在同一個日期裡）；施肥紀錄都算肥料日期。
  */
-/** 月曆點日期：開啟該果樹種類、該月份所有果園的噴藥（或施肥）紀錄 */
+/** 年曆點日期：開啟該果樹種類、該月份所有果園的噴藥（或施肥）紀錄 */
 export type OnOpenMonth = (m: { fruit: string; month: number; tone: Tone; focusId: string }) => void;
 
 export function SprayCalendar({
@@ -109,7 +105,6 @@ export function SprayCalendar({
   function datesFor(orchardId: string, fruit: string) {
     const pest = new Map<string, Day>();
     const fert = new Map<string, Day>();
-    // 先放施肥紀錄，同一天也有葉面肥噴藥時，點肥料日期優先開啟施肥紀錄
     for (const r of fertilizing) {
       if (r.orchardId !== orchardId || !coversFruit(r, fruit)) continue;
       addDay(fert, "fert", r.datetime.slice(0, 10), r.items.map((i) => fertEntry(i, mat(i.materialId))), r);
@@ -122,17 +117,18 @@ export function SprayCalendar({
         return m ? [{ m, e: sprayEntry(r, i, m) }] : [];
       });
       const p = used.filter((u) => u.m.category === "pesticide").map((u) => u.e);
-      const f = used.filter((u) => u.m.category === "fertilizer").map((u) => u.e);
-      // 還沒加入藥品的噴藥紀錄仍算噴藥日期
-      if (p.length || !f.length) addDay(pest, "pest", date, p, r);
-      if (f.length) addDay(fert, "fert", date, f, r);
+      const f = used.filter((u) => u.m.category === "fertilizer").map((u) => ({ ...u.e, fert: true }));
+      // 一筆噴藥紀錄只顯示一個噴藥日期，小視窗裡農藥、葉面肥一起列出
+      addDay(pest, "pest", date, [...p, ...f], r);
     }
     return { pest: sorted(pest), fert: sorted(fert) };
   }
 
-  // 各果樹種類，列出有種植這種果樹的果園
-  const groups = [...new Set(db.orchards.flatMap(fruitsOf))]
-    .map((fruit) => ({ fruit, orchards: db.orchards.filter((o) => fruitsOf(o).includes(fruit)) }))
+  // 各果樹種類，列出有種植這種果樹的果園；可隱藏已關閉的果園
+  const [showClosed, setShowClosed] = useState(true);
+  const orchards = db.orchards.filter((o) => showClosed || o.active !== false);
+  const groups = [...new Set(orchards.flatMap(fruitsOf))]
+    .map((fruit) => ({ fruit, orchards: orchards.filter((o) => fruitsOf(o).includes(fruit)) }))
     .filter((g) => g.orchards.length);
 
   return (
@@ -145,6 +141,15 @@ export function SprayCalendar({
           </>
         )}
         滑鼠移到日期上可看使用的藥品／肥料與倍數；點日期可開啟該筆噴藥／施肥紀錄。
+        <label className="flex cursor-pointer items-center gap-1.5 text-stone-700">
+          <input
+            type="checkbox"
+            checked={showClosed}
+            onChange={(e) => setShowClosed(e.target.checked)}
+            className="h-4 w-4 accent-emerald-700"
+          />
+          顯示已關閉果園
+        </label>
       </p>
 
       {!groups.length ? (
@@ -182,8 +187,8 @@ export function SprayCalendar({
                   // 整列依日期排序，檢視視窗可在這座果園全年的噴藥、施肥之間切換
                   const row = [...pest, ...fert].sort((a, b) => a.date.localeCompare(b.date) || a.tone.localeCompare(b.tone));
                   return (
-                    <tr key={o.id} className="hover:bg-stone-50">
-                      <td className="sticky left-0 z-10 border-r border-stone-200 bg-white px-3 py-2 pl-6 font-medium text-stone-800">
+                    <tr key={o.id} className="group hover:bg-yellow-100">
+                      <td className="sticky left-0 z-10 border-r border-stone-200 bg-white px-3 py-2 pl-6 font-medium text-stone-800 group-hover:bg-yellow-100">
                         {o.nameZh}
                       </td>
                       {MONTHS.map((m) => (
@@ -227,7 +232,7 @@ export function SprayCalendar({
                 {orchards.map((o) => {
                   const { pest, fert } = datesFor(o.id, fruit);
                   return (
-                    <tr key={o.id} className="hover:bg-stone-50">
+                    <tr key={o.id} className="hover:bg-yellow-100">
                       <td className="px-4 py-3 align-middle"><Dates days={pest} onPick={openIn(pest)} /></td>
                       <td className="border-x border-stone-200 px-4 py-3 text-center font-medium text-stone-800">{o.nameZh}</td>
                       <td className="px-4 py-3 align-middle"><Dates days={fert} onPick={openIn(fert)} /></td>
@@ -283,7 +288,7 @@ function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) 
             onMouseLeave={() => setTip(null)}
             onFocus={(e) => show(d, e.currentTarget)}
             onBlur={() => setTip(null)}
-            aria-label={`${d.date} ${d.tone === "pest" ? "噴藥" : "施肥"}：${d.entries.map((x) => `${x.name} ${x.rate}`).join("、") || "未加入藥品"}`}
+            aria-label={`${d.date} ${d.tone === "pest" ? "噴藥" : "施肥"}（對象：${d.targets.join("、") || "整個果園"}）：${d.entries.map((x) => `${x.name} ${x.rate}`).join("、") || "未加入藥品"}`}
             className={`cursor-pointer rounded-md px-2 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${TONE[d.tone]}`}
           >
             {md(d.date)}
@@ -300,12 +305,18 @@ function Dates({ days, onPick, empty = "—" }: { days: Day[]; onPick: (d: Day) 
         >
           <div className="mb-1.5 font-semibold text-stone-800">
             {tip.day.date}　{tip.day.tone === "pest" ? "噴藥" : "施肥"}
+            <span className="ml-2 font-normal text-stone-500">對象：{tip.day.targets.join("、") || "整個果園"}</span>
           </div>
           {tip.day.entries.length ? (
             <ul className="space-y-1">
               {tip.day.entries.map((e, i) => (
                 <li key={i} className="flex justify-between gap-3">
-                  <span className="text-stone-700">{e.name}</span>
+                  <span className="text-stone-700">
+                    {e.name}
+                    {e.fert && tip.day.tone === "pest" && (
+                      <span className="ml-1 rounded bg-amber-50 px-1 text-[10px] text-amber-700 ring-1 ring-inset ring-amber-200">肥料</span>
+                    )}
+                  </span>
                   <span className="shrink-0 font-medium tabular-nums text-stone-900">{e.rate}</span>
                 </li>
               ))}

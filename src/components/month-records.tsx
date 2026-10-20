@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { useCanEdit, useDB } from "@/lib/store";
 import { fmtDT } from "@/lib/utils";
 import { RecordCard } from "./record-view";
-import { coversFruit, fruitsOf, toOpen, tonesOf, type OpenRecord, type Tone } from "./spray-calendar";
+import { coversFruit, fruitsOf, toOpen, toneOf, type OpenRecord, type Tone } from "./spray-calendar";
 import { Button, Modal } from "./ui";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -51,10 +51,9 @@ export function MonthRecords({
     document.getElementById(`rec-${focusId}`)?.scrollIntoView({ block: "center", inline: "center" });
   }, [focusId]);
 
-  const category = (id: string) => db.materials.find((m) => m.id === id)?.category;
   const prefix = `${year}-${pad(month)}`;
   const records = [...db.spraying, ...db.fertilizing]
-    .filter((r) => r.datetime.startsWith(prefix) && coversFruit(r, fruit) && tonesOf(r, category).includes(tone))
+    .filter((r) => r.datetime.startsWith(prefix) && coversFruit(r, fruit) && toneOf(r) === tone)
     .sort((a, b) => a.datetime.localeCompare(b.datetime))
     .map(toOpen);
   const orchards = db.orchards

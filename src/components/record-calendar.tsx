@@ -103,7 +103,7 @@ export function RecordsToolbar({
   count: string;
   /** 多一個「全部年度」選項（year = ALL_YEARS） */
   allowAll?: boolean;
-  /** 清單／日曆／月曆切換（沒有日曆的頁面關掉） */
+  /** 清單／日曆／年曆切換（沒有日曆的頁面關掉） */
   showViews?: boolean;
 }) {
   const all = year === ALL_YEARS;
@@ -130,7 +130,7 @@ export function RecordsToolbar({
           [
             { v: "list", label: "清單", icon: List },
             { v: "calendar", label: "日曆", icon: CalendarDays },
-            { v: "month", label: "月曆", icon: CalendarRange },
+            { v: "month", label: "年曆", icon: CalendarRange },
           ] as const
         ).map(({ v, label, icon: Icon }) => (
           <button
@@ -188,7 +188,7 @@ export function RecordFilters(f: ReturnType<typeof useRecordsFilter>) {
 }
 
 /**
- * 日曆：點日期開上次／這次／下次三筆並排；月曆：點日期開同果樹所有果園當月的紀錄。
+ * 日曆：點日期開上次／這次／下次三筆並排；年曆：點日期開同果樹所有果園當月的紀錄。
  * 都是唯讀，按「修改」並輸入驗證碼後才進入噴藥／施肥的編輯表單。
  */
 export function RecordCalendar({ year, layout }: { year: number; layout: CalendarLayout }) {

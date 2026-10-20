@@ -142,7 +142,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
         <p className="mt-2 text-xs text-stone-500">帶入水量、配方、對象、人員與時間點，帶入後可再手動調整；果園與日期不會被覆蓋。</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-[2fr_0.9fr_0.7fr]">
         <OrchardSelect value={r.orchardId} onChange={(v) => set("orchardId", v)} />
         <Field label="施用日期時間">
           <Input type="datetime-local" value={r.datetime} onChange={(e) => set("datetime", e.target.value)} />

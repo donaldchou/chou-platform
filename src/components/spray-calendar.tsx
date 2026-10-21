@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useDB } from "@/lib/store";
 import { FRUITS, type FertilizingRecord, type Material, type Orchard, type SprayingRecord } from "@/lib/types";
-import { isReservation, RESERVE_MATERIAL } from "@/lib/utils";
+import { fertUnit, isReservation, RESERVE_MATERIAL } from "@/lib/utils";
 
 type Rec = SprayingRecord | FertilizingRecord;
 
-/** 使用的藥品／肥料與倍數；fert＝噴藥紀錄裡的肥料（葉面肥） */
+/** 使用的藥品／肥料與用量；fert＝噴藥紀錄裡的肥料（葉面肥） */
 type Entry = { name: string; rate: string; fert?: boolean };
 
 /**
@@ -41,21 +41,14 @@ export function fruitsOf(o: Orchard) {
   return list;
 }
 
-const dilutionOf = (m?: Material) => (Number(m?.dilution) > 0 ? `${m!.dilution} 倍` : "");
-
-/** 噴藥：顯示資材的使用倍數；資材沒填倍數時，用這次的用水量與用量換算 */
-function sprayEntry(r: SprayingRecord, item: SprayingRecord["items"][number], m: Material): Entry {
-  const rate =
-    dilutionOf(m) || (item.amount > 0 && r.waterLiters > 0 ? `約 ${Math.round((r.waterLiters * 1000) / item.amount)} 倍` : "");
-  return { name: m.nameZh, rate: rate || "未填倍數" };
+/** 噴藥：顯示這次的用量（cc 或 g） */
+function sprayEntry(item: SprayingRecord["items"][number], m: Material): Entry {
+  return { name: m.nameZh, rate: item.amount > 0 ? `${item.amount} ${item.unit}` : "未填用量" };
 }
 
-/** 施肥：有稀釋倍數就顯示倍數，否則顯示每棵用量 */
+/** 施肥：顯示這次的整體用量（液體是公升，其他是公斤） */
 function fertEntry(item: FertilizingRecord["items"][number], m?: Material): Entry {
-  const rate =
-    dilutionOf(m) ||
-    (item.gramsPerTree > 0 ? `每棵 ${item.gramsPerTree} g` : item.litersPerTree > 0 ? `每棵 ${item.litersPerTree} L` : "");
-  return { name: m?.nameZh ?? "（已刪除）", rate };
+  return { name: m?.nameZh ?? "（已刪除）", rate: item.amount > 0 ? `${item.amount} ${fertUnit(m)}` : "未填用量" };
 }
 
 const targetsOf = (r: Rec) => [...r.targets, ...r.otherTarget.split(/[、,，\s]+/).filter(Boolean)];
@@ -84,6 +77,7 @@ const MARKERS = [
   { name: "大滅松", tag: "大" }, // 資材名稱是「達滅速 (大滅松)」
   { name: "果霸", tag: "霸" },
   { name: "果之露", tag: "露" },
+  { name: "灌肥", tag: "液" },
 ];
 const tagsOf = (d: Day) =>
   MARKERS.filter((x) => d.entries.some((e) => e.name.includes(x.name)))
@@ -136,7 +130,7 @@ export function SprayCalendar({
       const date = r.datetime.slice(0, 10);
       const used = r.items.flatMap((i) => {
         const m = mat(i.materialId);
-        return m ? [{ m, e: sprayEntry(r, i, m) }] : [];
+        return m ? [{ m, e: sprayEntry(i, m) }] : [];
       });
       const p = used.filter((u) => u.m.category === "pesticide").map((u) => u.e);
       const f = used.filter((u) => u.m.category === "fertilizer").map((u) => ({ ...u.e, fert: true }));
@@ -152,8 +146,12 @@ export function SprayCalendar({
   // 各果樹種類，列出有種植這種果樹的果園；可隱藏已關閉的果園
   const [showClosed, setShowClosed] = useState(true);
   const orchards = db.orchards.filter((o) => showClosed || o.active !== false);
-  const groups = [...new Set(orchards.flatMap(fruitsOf))]
-    .map((fruit) => ({ fruit, orchards: orchards.filter((o) => fruitsOf(o).includes(fruit)) }))
+  // 果園有種的果樹，加上今年紀錄的對象（株數沒填的果樹，紀錄也不會漏掉）
+  const fruitsIn = (o: Orchard) => [
+    ...new Set([...fruitsOf(o), ...[...spraying, ...fertilizing].filter((r) => r.orchardId === o.id).flatMap(targetsOf)]),
+  ];
+  const groups = [...new Set(orchards.flatMap(fruitsIn))]
+    .map((fruit) => ({ fruit, orchards: orchards.filter((o) => fruitsIn(o).includes(fruit)) }))
     .filter((g) => g.orchards.length);
 
   return (
@@ -166,7 +164,7 @@ export function SprayCalendar({
           </>
         )}
         <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-red-200 ring-1 ring-inset ring-red-400" />預約噴藥／施肥</span>
-        滑鼠移到日期上可看使用的藥品／肥料與倍數；點日期可開啟該筆噴藥／施肥紀錄。
+        滑鼠移到日期上可看使用的藥品／肥料與用量；點日期可開啟該筆噴藥／施肥紀錄。
         <label className="flex cursor-pointer items-center gap-1.5 text-stone-700">
           <input
             type="checkbox"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useDB } from "@/lib/store";
 import { FRUITS, type FertilizingRecord, type Material, type Orchard, type SprayingRecord } from "@/lib/types";
 import { fertUnit, isReservation, RESERVE_MATERIAL } from "@/lib/utils";
@@ -27,7 +27,43 @@ export const toneOf = (r: Rec): Tone => ("stage" in r ? "pest" : "fert");
 /** 日曆：果園在中間、左農藥右肥料；年曆：果園在左、1～12 月各一欄 */
 export type CalendarLayout = "calendar" | "month";
 
-export type OpenRecord = { kind: "spraying"; record: SprayingRecord } | { kind: "fertilizing"; record: FertilizingRecord };
+/* ---------------- 「顯示已關閉果園」：噴藥／施肥的日曆、年曆共用，記在這台電腦的瀏覽器 ---------------- */
+const SHOW_CLOSED_KEY = "chou-calendar-show-closed";
+const showClosedListeners = new Set<() => void>();
+let memoryShowClosed: boolean | null = null;
+
+function readShowClosed() {
+  if (memoryShowClosed !== null) return memoryShowClosed;
+  try {
+    return localStorage.getItem(SHOW_CLOSED_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function writeShowClosed(v: boolean) {
+  try {
+    localStorage.setItem(SHOW_CLOSED_KEY, v ? "1" : "0");
+  } catch {
+    // 無法儲存（例如無痕模式）時，只在這次瀏覽有效
+  }
+  memoryShowClosed = v;
+  showClosedListeners.forEach((l) => l());
+}
+
+function useShowClosed(): [boolean, (v: boolean) => void] {
+  const v = useSyncExternalStore(
+    (l) => {
+      showClosedListeners.add(l);
+      return () => showClosedListeners.delete(l);
+    },
+    readShowClosed,
+    () => true,
+  );
+  return [v, writeShowClosed];
+}
+
+export type OpenRecord ={ kind: "spraying"; record: SprayingRecord } | { kind: "fertilizing"; record: FertilizingRecord };
 
 /** 紀錄的對象是否包含這種果樹；沒選對象的紀錄視為整個果園都有施用 */
 export function coversFruit(r: Rec, fruit: string) {
@@ -144,7 +180,7 @@ export function SprayCalendar({
   }
 
   // 各果樹種類，列出有種植這種果樹的果園；可隱藏已關閉的果園
-  const [showClosed, setShowClosed] = useState(true);
+  const [showClosed, setShowClosed] = useShowClosed();
   const orchards = db.orchards.filter((o) => showClosed || o.active !== false);
   // 果園有種的果樹，加上今年紀錄的對象（株數沒填的果樹，紀錄也不會漏掉）
   const fruitsIn = (o: Orchard) => [

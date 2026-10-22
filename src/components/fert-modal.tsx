@@ -33,10 +33,12 @@ import {
   Modal,
   NumInput,
   PhotoUpload,
+  SearchSelect,
   SectionTitle,
   Select,
   Textarea,
   Thumb,
+  type SearchOption,
 } from "./ui";
 
 /**
@@ -73,6 +75,12 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
   const [r, setR] = useState(record);
   const set = <K extends keyof FertilizingRecord>(k: K, v: FertilizingRecord[K]) => setR((p) => ({ ...p, [k]: v }));
   const ferts = db.materials.filter((m) => m.category === "fertilizer");
+  // 搜尋時也比對廠商與成分說明
+  const fertOptions: SearchOption[] = ferts.map((m) => ({
+    value: m.id,
+    label: materialName(m),
+    keywords: `${m.manufacturer ?? ""} ${m.targets}`,
+  }));
   const c = cost(r);
 
   // 參考過去的施肥紀錄：選果園＋年份＋日期後，把肥料等內容帶入目前表單（不會存進資料庫）
@@ -107,6 +115,8 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
   const nextDate = addDays(r.datetime, nextDays);
 
   function save() {
+    if (!r.orchardId) return alert("請選擇果園名稱。");
+    if (r.items.some((i) => !i.materialId)) return alert("還有肥料尚未選擇品牌，請選擇或刪除該列。");
     let reservation: FertilizingRecord | null = null;
     if (nextDays > 0 && nextDate) {
       const m = ferts.find((x) => x.nameZh === RESERVE_MATERIAL);
@@ -203,7 +213,7 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
           title="肥料品牌與用量"
           addLabel="新增肥料"
           onAdd={() =>
-            set("items", [...r.items, { id: uid(), materialId: ferts[0].id, gramsPerTree: 0, litersPerTree: 0, seconds: 0, amount: 0 }])
+            set("items", [...r.items, { id: uid(), materialId: "", gramsPerTree: 0, litersPerTree: 0, seconds: 0, amount: 0 }])
           }
         >
           {r.items.map((it, i) => {
@@ -223,9 +233,7 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
                 </div>
                 <Thumb src={m?.photos?.[0]} photos={m?.photos} showCount className="h-10 w-10" />
                 <Field label="肥料品牌">
-                  <Select value={it.materialId} onChange={(e) => upd({ materialId: e.target.value })}>
-                    {ferts.map((f) => <option key={f.id} value={f.id}>{materialName(f)}</option>)}
-                  </Select>
+                  <SearchSelect value={it.materialId} options={fertOptions} onChange={(id) => upd({ materialId: id })} />
                 </Field>
                 <Field label="重量 g／每棵">
                   <NumInput value={it.gramsPerTree} onChange={(v) => upd({ gramsPerTree: v })} />

@@ -95,6 +95,8 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
   const nextDate = addDays(r.datetime, nextDays);
 
   function save() {
+    if (!r.orchardId) return alert("請選擇果園名稱。");
+    if (r.items.some((i) => !i.materialId)) return alert("還有藥品／肥料尚未選擇品牌，請選擇或刪除該列。");
     let reservation: SprayingRecord | null = null;
     if (nextDays > 0 && nextDate) {
       const m = pesticides.find((x) => x.nameZh === RESERVE_MATERIAL);
@@ -126,7 +128,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
         stage: r.stage,
         targets: targetsText(r.targets, r.otherTarget),
         waterLiters: r.waterLiters,
-        materialIds: r.items.map((i) => i.materialId),
+        materialIds: r.items.map((i) => i.materialId).filter(Boolean),
       });
       set("aiSuggestion", res.advice);
       if (res.source === "fallback") setAiNote(res.reason ?? "");
@@ -200,9 +202,9 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
         title="配方"
         addLabel="加入藥品／肥料"
         onAdd={() => {
-          const first = pesticides[0] ?? ferts[0];
-          if (!first) return alert("請先在「農藥」或「肥料」頁面建立資料。");
-          set("items", [...r.items, { id: uid(), materialId: first.id, amount: 0, unit: first.unit === "ml" ? "cc" : "g" }]);
+          if (!materialOptions.length) return alert("請先在「農藥」或「肥料」頁面建立資料。");
+          // 品牌預設空白，選了之後才依資材設定單位
+          set("items", [...r.items, { id: uid(), materialId: "", amount: 0, unit: "g" }]);
         }}
       >
         {r.items.length === 0 && <p className="text-sm text-stone-400">尚未加入藥品</p>}

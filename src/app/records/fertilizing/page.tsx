@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Printer, Share2 } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { FertilizingRecord } from "@/lib/types";
-import { cardPhotoOf, defaultOrchard, fertPacks, fertUnit, fmtDT, isReservation, missingPrice, money, todayStr, uid } from "@/lib/utils";
+import { cardPhotoOf, fertPacks, fertUnit, fmtDT, isReservation, missingPrice, money, todayStr, uid } from "@/lib/utils";
 import { useFertCost } from "@/components/fert-modal";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
@@ -25,8 +25,8 @@ export default function FertilizingPage() {
   const mat = (id: string) => db.materials.find((m) => m.id === id);
 
   const create = (): FertilizingRecord => ({
-    // 施肥通常一早出工，預設今天早上 08:00
-    id: uid(), orchardId: defaultOrchard(db.orchards)?.id ?? "", datetime: `${todayStr()}T08:00`, waterLiters: 0, items: [], targets: [], otherTarget: "",
+    // 果園預設空白；施肥通常一早出工，預設今天早上 08:00
+    id: uid(), orchardId: "", datetime: `${todayStr()}T08:00`, waterLiters: 0, items: [], targets: [], otherTarget: "",
     employeeIds: [], photos: [], note: "",
   });
 

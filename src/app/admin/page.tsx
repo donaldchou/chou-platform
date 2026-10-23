@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Eye, KeyRound, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Eye, KeyRound, Plus, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useCodeGate } from "@/components/code-modal";
 import { UnlockPanel } from "@/components/unlock-panel";
 import {
@@ -18,11 +18,12 @@ import {
 } from "@/components/ui";
 import { reload, useDB, useMe } from "@/lib/store";
 import type { DB } from "@/lib/types";
+import { fileSize, openStoredFile, photoSrc } from "@/lib/utils";
 
-type Tab = "users" | "data" | "trash";
+type Tab = "users" | "data" | "trash" | "files";
 
 /* ---------------- 目前分頁，記在這台電腦的瀏覽器（重新整理後保留） ---------------- */
-const TABS: Tab[] = ["users", "data", "trash"];
+const TABS: Tab[] = ["users", "data", "trash", "files"];
 const TAB_KEY = "chou-admin-tab";
 const tabListeners = new Set<() => void>();
 let memoryTab: Tab | null = null;
@@ -75,9 +76,10 @@ export default function AdminPage() {
           { value: "users", label: "使用者管理" },
           { value: "data", label: "所有資料" },
           { value: "trash", label: "已刪除紀錄" },
+          { value: "files", label: "清理未使用的檔案" },
         ]}
       />
-      {tab === "users" ? <UsersTab /> : tab === "data" ? <DataTab /> : <TrashTab />}
+      {tab === "users" ? <UsersTab /> : tab === "data" ? <DataTab /> : tab === "trash" ? <TrashTab /> : <FilesTab />}
     </>
   );
 }
@@ -700,6 +702,140 @@ function TrashTab() {
           </pre>
         </Modal>
       )}
+      {gate.dialog}
+    </>
+  );
+}
+
+/* ---------------- 清理未使用的檔案 ---------------- */
+type HostFile = { url: string; size: number; time: string; used: boolean; recent: boolean };
+type FileScan = { total: number; totalBytes: number; used: number; unused: HostFile[] };
+
+/** ll3 主機上的資料夾（上傳時的 folder） */
+const FOLDERS: Record<string, string> = {
+  orchards: "果園",
+  contracts: "合約",
+  bills: "帳單",
+  suppliers: "店家",
+  materials: "資材",
+  knowledge: "知識",
+  workers: "外請工人",
+  fertilizing: "施肥",
+  salaries: "薪資",
+  propagation: "種苗／嫁接",
+  phenology: "開花／結果",
+  photos: "照片",
+};
+
+function FilesTab() {
+  // 每按一次「重新檢查」version + 1；結果記下是哪一次的，對不上就是檢查中
+  const [version, setVersion] = useState(0);
+  const [result, setResult] = useState<{ version: number; data?: FileScan; error?: string } | null>(null);
+  const gate = useCodeGate();
+
+  useEffect(() => {
+    call<FileScan>("/api/admin/files").then(
+      (data) => setResult({ version, data }),
+      (e) => setResult({ version, error: errMsg(e) }),
+    );
+  }, [version]);
+  const load = () => setVersion((v) => v + 1);
+  const loading = result?.version !== version;
+  const data = result?.data ?? null;
+  const error = result?.error ?? "";
+
+  const removable = data?.unused.filter((f) => !f.recent) ?? [];
+  const recent = (data?.unused.length ?? 0) - removable.length;
+
+  function clean() {
+    gate.ask({
+      title: "刪除未使用的檔案",
+      confirmLabel: "確認刪除",
+      danger: true,
+      confirm: true,
+      message: (
+        <>
+          即將刪除 <b>{removable.length}</b> 個未使用的檔案（{fileSize(removable.reduce((s, f) => s + f.size, 0))}），刪除後無法復原。
+        </>
+      ),
+      submit: async (code) => {
+        try {
+          const r = await call<{ deleted: number; failed: number }>("/api/admin/files", { method: "DELETE", code });
+          alert(`已刪除 ${r.deleted} 個檔案${r.failed ? `，${r.failed} 個刪除失敗` : ""}`);
+        } catch (e) {
+          return { ok: false, error: errMsg(e) };
+        }
+        load();
+        return { ok: true };
+      },
+    });
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-3xl text-sm text-stone-500">
+          比對 ll3 主機上的照片與檔案和資料庫，找出沒有被任何資料用到的檔案（例如上傳照片後按了取消）。
+          24 小時內上傳的先保留，因為可能還有表單正在填寫；已刪除紀錄裡的照片算使用中。
+        </p>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={load} disabled={loading}>
+            <RefreshCw size={15} /> 重新檢查
+          </Button>
+          <Button variant="danger" onClick={clean} disabled={!removable.length || loading}>
+            <Trash2 size={15} /> 刪除 {removable.length} 個未使用的檔案
+          </Button>
+        </div>
+      </div>
+      {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {data && (
+        <p className="mb-3 text-sm text-stone-700">
+          主機上共 {data.total} 個檔案（{fileSize(data.totalBytes)}），使用中 {data.used} 個，未使用 {data.unused.length} 個
+          {recent > 0 && <span className="text-stone-500">（其中 {recent} 個是 24 小時內上傳的，暫不刪除）</span>}。
+        </p>
+      )}
+      <Table head={["預覽", "類別", "檔名", "大小", "上傳時間", "狀態"]}>
+        {data?.unused.map((f) => {
+          const [folder, name] = f.url.slice(4).split("/");
+          const type = /\.pdf$/i.test(name) ? "application/pdf" : /\.(jpe?g|png|webp|gif)$/i.test(name) ? "image/jpeg" : "";
+          return (
+            <tr key={f.url} className="hover:bg-stone-50">
+              <Td>
+                {type.startsWith("image/") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoSrc(f.url)} alt="" loading="lazy" className="h-12 w-12 rounded-md border border-stone-200 object-cover" />
+                ) : (
+                  <button
+                    className="text-xs text-emerald-700 hover:underline"
+                    onClick={() => openStoredFile({ url: f.url, name, size: f.size, type })}
+                  >
+                    開啟
+                  </button>
+                )}
+              </Td>
+              <Td>{FOLDERS[folder] ?? folder}</Td>
+              <Td className="font-mono text-xs text-stone-500">{name}</Td>
+              <Td className="whitespace-nowrap text-stone-600">{fileSize(f.size)}</Td>
+              <Td className="whitespace-nowrap text-stone-600">{fmtTime(f.time)}</Td>
+              <Td>{f.recent ? <Badge tone="amber">24 小時內，保留</Badge> : <Badge tone="red">可刪除</Badge>}</Td>
+            </tr>
+          );
+        })}
+        {data && !data.unused.length && (
+          <tr>
+            <Td colSpan={6} className="py-8 text-center text-stone-400">
+              沒有未使用的檔案
+            </Td>
+          </tr>
+        )}
+        {!data && !error && (
+          <tr>
+            <Td colSpan={6} className="py-8 text-center text-stone-400">
+              檢查中…
+            </Td>
+          </tr>
+        )}
+      </Table>
       {gate.dialog}
     </>
   );

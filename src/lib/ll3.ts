@@ -74,6 +74,9 @@ export const ll3Stat = (path: string) => call<{ exists: boolean; size?: number }
 
 export const ll3Delete = (path: string) => call<object>("del", { p: path });
 
+/** 主機上所有檔案（不含 _tmp），t 是最後修改時間（UTC 秒數） */
+export const ll3List = async () => (await call<{ files: { p: string; size: number; t: number }[] }>("list", {})).files;
+
 /** 同時送出的塊數：Vercel 在美國，每塊往返台灣約 0.7 秒，一塊一塊送太慢 */
 const PARALLEL = 4;
 

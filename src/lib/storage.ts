@@ -1,6 +1,9 @@
 import { randomBytes } from "node:crypto";
+import { TrashModel } from "@/models/trash";
 import { HttpError } from "./api";
-import { LL3_PREFIX, isLl3Url, ll3Delete, ll3Get } from "./ll3";
+import { COLLECTIONS } from "./collections";
+import { LL3_PREFIX, isLl3Url, ll3Delete, ll3Get, ll3List } from "./ll3";
+import { connectDB } from "./mongodb";
 
 /** 照片與檔案都存在 ll3 主機，MongoDB 存 "ll3:<folder>/<name>" */
 export const isStoredUrl = isLl3Url;
@@ -51,12 +54,49 @@ export function collectFileUrls(value: unknown, out = new Set<string>()): Set<st
   return out;
 }
 
-/** 刪除不再使用的照片／檔案。失敗只記錄，不影響資料庫操作。 */
+/** 刪除不再使用的照片／檔案。失敗只記錄，不影響資料庫操作；回傳刪除失敗的數量。 */
 export async function deleteFiles(urls: Iterable<string>) {
   const list = [...urls];
-  if (!list.length) return;
+  if (!list.length) return 0;
   const results = await Promise.allSettled(list.map((u) => ll3Delete(u.slice(LL3_PREFIX.length))));
-  for (const r of results) if (r.status === "rejected") console.warn("刪除檔案失敗：", r.reason);
+  const failed = results.filter((r) => r.status === "rejected");
+  for (const r of failed) console.warn("刪除檔案失敗：", r.reason);
+  return failed.length;
+}
+
+/**
+ * 已儲存的資料用到的所有照片／檔案網址。資料量小，直接掃全部集合（照片欄位很多、又有巢狀），
+ * 包含已刪除紀錄（trash）——那些照片要等永久刪除時才刪。
+ */
+async function referencedFiles() {
+  await connectDB();
+  const used = new Set<string>();
+  for (const model of [...Object.values(COLLECTIONS), TrashModel]) collectFileUrls(await model.find().lean(), used);
+  return used;
+}
+
+/** 已儲存的資料是否用到這個檔案 */
+export async function isFileReferenced(url: string) {
+  return (await referencedFiles()).has(url);
+}
+
+/** 上傳後這麼久還沒被資料用到，才算「未使用」（避免刪到還在填寫中的表單剛上傳的檔案） */
+export const UNUSED_AFTER_HOURS = 24;
+
+export type HostFile = { url: string; size: number; time: string; used: boolean; recent: boolean };
+
+/** 比對 ll3 主機上的檔案和資料庫：先列主機再查資料庫，列出之後才存進資料的檔案也會算使用中 */
+export async function scanFiles(): Promise<HostFile[]> {
+  const files = await ll3List();
+  const used = await referencedFiles();
+  const limit = Date.now() / 1000 - UNUSED_AFTER_HOURS * 3600;
+  return files.map((f) => ({
+    url: LL3_PREFIX + f.p,
+    size: f.size,
+    time: new Date(f.t * 1000).toISOString(),
+    used: used.has(LL3_PREFIX + f.p),
+    recent: f.t > limit,
+  }));
 }
 
 /** 拒絕 base64 照片，確保 MongoDB 只存網址 */

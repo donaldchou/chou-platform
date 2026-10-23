@@ -196,6 +196,15 @@ export async function uploadFile(
   return { url: data.url, name: data.name, size: data.size, type: data.type };
 }
 
+/**
+ * 表單裡按 ✕ 移除照片／檔案時呼叫：還沒存進資料的檔案馬上從 ll3 主機刪掉；
+ * 已儲存的資料在用的檔案伺服器會保留，等按「儲存」時才刪（按取消就留著）。失敗不影響表單。
+ */
+export function discardUpload(url: string) {
+  if (!url.startsWith("ll3:")) return;
+  fetch(`/api/upload?url=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+}
+
 /** 上傳照片（先在瀏覽器壓縮），回傳照片網址 */
 export async function uploadPhoto(file: File, folder = "photos"): Promise<string> {
   return (await uploadFile(await compressImage(file), "photo.jpg", folder)).url;

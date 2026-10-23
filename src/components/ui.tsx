@@ -8,7 +8,7 @@ import { Lightbox } from "./lightbox";
 import { UnlockTimer, isCodePage } from "./unlock";
 import { useCanEdit } from "@/lib/store";
 import type { StoredFile } from "@/lib/types";
-import { fileSize, openStoredFile, photoSrc, uploadFile, uploadPhoto } from "@/lib/utils";
+import { discardUpload, fileSize, openStoredFile, photoSrc, uploadFile, uploadPhoto } from "@/lib/utils";
 
 export { Lightbox };
 
@@ -566,7 +566,10 @@ export function PhotoUpload({
           <img src={photoSrc(src)} alt="" className="h-full w-full cursor-zoom-in object-cover" onClick={() => setPreview(i)} />
           <button
             type="button"
-            onClick={() => onChange(value.filter((_, j) => j !== i))}
+            onClick={() => {
+              discardUpload(src);
+              onChange(value.filter((_, j) => j !== i));
+            }}
             className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white"
             aria-label="移除照片"
           >
@@ -665,7 +668,15 @@ export function FileUpload({
 
   return (
     <div className="space-y-2">
-      {value.length > 0 && <FileList files={value} onRemove={(i) => onChange(value.filter((_, j) => j !== i))} />}
+      {value.length > 0 && (
+        <FileList
+          files={value}
+          onRemove={(i) => {
+            discardUpload(value[i].url);
+            onChange(value.filter((_, j) => j !== i));
+          }}
+        />
+      )}
       {value.length < max && (
         <button
           type="button"

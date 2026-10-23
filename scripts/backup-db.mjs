@@ -8,7 +8,7 @@
  *   第一行  {"database", "createdAt", "collections": [{name, indexes}]}
  *   中間    {"c": collection 名稱, "d": 文件}，同一個 collection 的文件連在一起
  *   最後一行 {"counts": {名稱: 筆數}}（缺這行代表檔案不完整）
- * 還原用 npm run restore（見 scripts/restore-db.mjs）。照片在 Vercel Blob，不在備份裡。
+ * 還原用 npm run restore（見 scripts/restore-db.mjs）。照片與檔案在 ll3 主機（/platform/chou_platform），不在備份裡。
  */
 import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

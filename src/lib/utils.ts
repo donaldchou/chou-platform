@@ -160,8 +160,8 @@ export function compressImage(file: File, max = 1600): Promise<Blob> {
   });
 }
 
-/** 照片／檔案存在 ll3 主機（ll3:...）或舊的 Vercel Blob，都不能直接開啟，要經過 /api/photo */
-const isStored = (url: string) => url.startsWith("ll3:") || url.includes(".blob.vercel-storage.com/");
+/** 照片／檔案存在 ll3 主機（ll3:...），不能直接開啟，要經過 /api/photo */
+const isStored = (url: string) => url.startsWith("ll3:");
 
 /** 把 MongoDB 中的照片網址轉成 <img> 可用的網址 */
 export const photoSrc = (url: string) => (isStored(url) ? `/api/photo?url=${encodeURIComponent(url)}` : url);

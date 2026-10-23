@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { readStored } from "@/lib/storage";
 
 /**
- * GET /api/photo?url=<ll3:... 或舊的 Blob 檔案網址>
+ * GET /api/photo?url=<ll3:...>
  * 照片不能直接公開開啟，由這裡讀取後回傳。
  */
 export async function GET(req: NextRequest) {

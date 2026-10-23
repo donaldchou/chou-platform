@@ -1,13 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { HttpError } from "./api";
-import { deleteBlobUrls, isBlobUrl, readBlob } from "./blob";
 import { LL3_PREFIX, isLl3Url, ll3Delete, ll3Get } from "./ll3";
 
-/**
- * 照片與檔案的存放位置：新的存在 ll3 主機（"ll3:<folder>/<name>"），
- * 舊的還在 Vercel Blob（https://...blob.vercel-storage.com/...）。兩種網址這裡都認得。
- */
-export const isStoredUrl = (v: unknown): v is string => isBlobUrl(v) || isLl3Url(v);
+/** 照片與檔案都存在 ll3 主機，MongoDB 存 "ll3:<folder>/<name>" */
+export const isStoredUrl = isLl3Url;
 
 /** 可以上傳的副檔名與 Content-Type（要跟 file_api.asp 的 ContentTypeOf 一致） */
 export const FILE_TYPES: Record<string, string> = {
@@ -34,23 +30,17 @@ export function newFilePath(folder: string, ext: string) {
   return `${folder}/${d}-${randomBytes(6).toString("hex")}.${ext}`;
 }
 
-/** 讀檔，給 /api/photo、/api/file 使用。range 只支援 ll3 的檔案 */
+/** 讀檔，給 /api/photo、/api/file 使用 */
 export async function readStored(url: string, range?: { offset: number; length: number }) {
-  if (isLl3Url(url)) {
-    const res = await ll3Get(url.slice(LL3_PREFIX.length), range);
-    const path = url.slice(LL3_PREFIX.length);
-    return {
-      body: res.body!,
-      contentType: FILE_TYPES[extOf(path)] ?? "application/octet-stream",
-      length: Number(res.headers.get("content-length") ?? 0),
-      total: Number(res.headers.get("x-file-size") ?? 0),
-    };
-  }
-  if (isBlobUrl(url)) {
-    const { stream, blob } = await readBlob(url);
-    return { body: stream, contentType: blob.contentType, length: blob.size, total: blob.size };
-  }
-  throw new HttpError(400, "不是這個平台的檔案網址");
+  if (!isLl3Url(url)) throw new HttpError(400, "不是這個平台的檔案網址");
+  const path = url.slice(LL3_PREFIX.length);
+  const res = await ll3Get(path, range);
+  return {
+    body: res.body!,
+    contentType: FILE_TYPES[extOf(path)] ?? "application/octet-stream",
+    length: Number(res.headers.get("content-length") ?? 0),
+    total: Number(res.headers.get("x-file-size") ?? 0),
+  };
 }
 
 /** 找出資料中所有照片／檔案網址（包含巢狀欄位，例如 contract.photos、contract.files[].url） */
@@ -65,10 +55,7 @@ export function collectFileUrls(value: unknown, out = new Set<string>()): Set<st
 export async function deleteFiles(urls: Iterable<string>) {
   const list = [...urls];
   if (!list.length) return;
-  const results = await Promise.allSettled([
-    deleteBlobUrls(list.filter(isBlobUrl)),
-    ...list.filter(isLl3Url).map((u) => ll3Delete(u.slice(LL3_PREFIX.length))),
-  ]);
+  const results = await Promise.allSettled(list.map((u) => ll3Delete(u.slice(LL3_PREFIX.length))));
   for (const r of results) if (r.status === "rejected") console.warn("刪除檔案失敗：", r.reason);
 }
 

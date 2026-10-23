@@ -16,7 +16,8 @@ npm run dev
 
 ```
 MONGODB_URI=mongodb+srv://...     # 必填
-BLOB_READ_WRITE_TOKEN=...         # 必填，照片存放（Vercel Blob，private store）
+LL3_FILE_KEY=...                  # 必填，ll3 檔案主機簽章金鑰（同 file_api.asp 的 FILE_API_KEY）
+BLOB_READ_WRITE_TOKEN=...         # 舊照片搬到 ll3 之前才需要（Vercel Blob）
 GEMINI_API_KEY=...                # 選填，噴藥 AI 建議；沒設定時使用內建建議
 ORCHARD_CODE=...                  # 必填，新增／編輯／刪除果園時要輸入的驗證碼
 SUPPLIER_CODE=...                 # 必填，新增／編輯／刪除貨源店家時要輸入的驗證碼
@@ -109,14 +110,15 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 - **庫存**：目前庫存不存在資料庫，由前端 `src/lib/stock.ts` 依時間順序計算：進貨＋、報廢−、盤點直接設定成實際數量，噴藥（`amount`）、施肥（包數 × 每包容量）、套袋（箱數 × 每箱袋數，結餘袋數加回）自動扣除。每項資材從第一次盤點／進貨開始計算，之前的用量不扣；未來時間的紀錄不扣。`stock` 的 `category` 由後端依資材設定；只改 `minStock` 不更新資材的異動時間；刪除資材會一併刪除它的庫存異動。
 - **驗證碼**：新增／編輯／刪除果園（`ORCHARD_CODE`；只改水塔管線照片不需要）、貨源店家（`SUPPLIER_CODE`）、肥料（`FERTILIZER_CODE`）、農藥（`PESTICIDE_CODE`）、包材／乾貨（`PACKAGING_CODE`；庫存異動依資材類別使用同一組驗證碼）、噴藥紀錄（`SPRAYING_CODE`）、施肥紀錄（`FERTILIZING_CODE`）、剪枝／開花／結果／疏果紀錄（`PRUNING_CODE`；砍草不需要）、種苗／嫁接／環剝紀錄（`PROPAGATION_CODE`）、知識管理（`KNOWLEDGE_CODE`）、外請工人（`WORKER_CODE`）、員工管理／指派（`STAFF_CODE`：tasks、salaries、bonuses、employees）與後台使用者管理（`ADMIN_CODE`，`/api/admin/users`；後台「所有資料」的刪除也會先驗證這組）時，必須帶 `x-verify-code` 標頭（值用 `encodeURIComponent` 編碼），相符才會執行，否則回 403。規則定義在 `src/lib/codes.ts`。
 - **驗證碼解鎖**：後台管理頁輸入一次驗證碼（必須和上面所有驗證碼都相符），`POST /api/unlock` 會發一個綁定登入者、1 小時有效的 HttpOnly cookie `chou_unlock`，期間所有需要驗證碼的操作都不用帶 `x-verify-code`。`GET /api/unlock` 回傳到期時間，`DELETE /api/unlock` 提前鎖定，登出時也會清掉。有驗證碼的頁面上方會顯示倒數。
-- **照片**：瀏覽器先壓縮成 JPEG（最長邊 1600px），上傳到 Vercel Blob 的 `chou-platform/<folder>/`，MongoDB 只存檔案網址（base64 會被拒絕）。編輯時移除的照片、刪除資料（含果園連帶刪除的紀錄）時的照片，會自動從 Blob 刪除。
+- **照片與檔案**：存在 ll3 主機 `http://www.ll3.com.tw/platform/chou_platform/<folder>/`（`file_api.asp`，原始碼在 chou-suda-print\platform_change_code；資料夾有 web.config 擋直接下載），MongoDB 存 `ll3:<folder>/<name>`（base64 會被拒絕）。照片在瀏覽器先壓縮成 JPEG（最長邊 1600px）；合約檔案（PDF、Excel、Word…，上限 30MB）存在 `contract.files`（`{url,name,size,type}`）。上傳／下載都分段（瀏覽器↔Vercel 每段 3MB，Vercel↔ll3 每塊 150KB，主機 ASP 一次只收約 200KB），請求用 HMAC 簽章。編輯時移除的、刪除資料（含果園連帶刪除的紀錄）時的照片與檔案會自動刪除。舊的 Vercel Blob 網址仍可讀取，用 `node scripts/migrate-blob-to-ll3.mjs` 搬家。
 
 ### 其他
 
 | 方法 | 路徑 | 說明 |
 |---|---|---|
-| POST | `/api/upload` | 上傳照片（multipart：`file`、`folder`），回傳 `{ url }` |
-| GET | `/api/photo?url=` | 讀取照片（private store 不能直接開啟網址） |
+| POST | `/api/upload` | 上傳到 ll3（multipart：`file`、`uploadId`、`index`、`last`、`name`、`size`、`folder`；大檔案分段送），最後一段回傳 `{ url, name, size, type }` |
+| GET | `/api/photo?url=` | 讀取照片 |
+| GET | `/api/file?url=&part=` | 分段讀取檔案（每段 3MB，`X-File-Size` 是總大小） |
 | POST | `/api/verify-code` | 只檢查驗證碼，body：`{ collection, action: "create" \| "update" \| "delete", code, category? }` |
 | GET | `/api/db` | 一次取得所有資料（前端啟動時使用） |
 | GET | `/api/health` | 檢查資料庫連線 |
@@ -138,4 +140,4 @@ JWT_SECRET=...                    # 必填，登入 JWT 的簽章密鑰（至少
 
 ## 尚未實作
 
-- 上傳照片後按「取消」不儲存，已上傳的照片會留在 Blob 中（未被任何資料使用）
+- 上傳照片後按「取消」不儲存，已上傳的照片會留在 ll3 主機上（未被任何資料使用）

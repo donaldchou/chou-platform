@@ -29,6 +29,14 @@ export interface Seedlings {
   李子苗: number;
 }
 
+/** 上傳到 ll3 主機的檔案（PDF、Excel…），url 是 "ll3:folder/name.ext" */
+export interface StoredFile {
+  url: string;
+  name: string; // 原始檔名
+  size: number;
+  type: string; // Content-Type
+}
+
 export interface Orchard {
   id: ID;
   nameZh: string;
@@ -38,7 +46,7 @@ export interface Orchard {
   photos: string[];
   parcels: Parcel[];
   acquisition: { cost: number; date: string; name: string; phone: string };
-  contract: { start: string; end: string; photos: string[] };
+  contract: { start: string; end: string; photos: string[]; files: StoredFile[] };
   trees: Record<Fruit, number> & { otherName: string; other: number };
   waterTank: { sizeTon: number; count: number };
   pump: { spec: string; price: number };

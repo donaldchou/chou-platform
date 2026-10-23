@@ -8,7 +8,7 @@ import { emptyMeter } from "@/lib/defaults";
 import { FRUITS, LAND_TYPES, type LandType, type Meter, type Orchard, type Seedlings } from "@/lib/types";
 import { daysUntil, uid } from "@/lib/utils";
 import { CodeModal } from "./code-modal";
-import { Button, Card, Field, Input, NumInput, PhotoUpload, Select, Textarea } from "./ui";
+import { Button, Card, Field, FileUpload, Input, NumInput, PhotoUpload, Select, Textarea } from "./ui";
 
 const SEEDLINGS: (keyof Seedlings)[] = ["苦桃苗", "甜柿苗", "李子苗"];
 
@@ -257,6 +257,9 @@ function OrchardForm({ initial, isNew, code }: { initial: Orchard; isNew: boolea
             </Field>
             <Field label="合約照片" group className="sm:col-span-2">
               <PhotoUpload folder="contracts" value={o.contract.photos} onChange={(v) => set("contract", { ...o.contract, photos: v })} />
+            </Field>
+            <Field label="合約檔案" group className="sm:col-span-2">
+              <FileUpload folder="contracts" value={o.contract.files ?? []} onChange={(v) => set("contract", { ...o.contract, files: v })} />
             </Field>
           </div>
         </Card>

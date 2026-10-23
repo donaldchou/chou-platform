@@ -15,6 +15,11 @@ export const dateTime = { type: String, default: "", match: /^$|^\d{4}-\d{2}-\d{
 export const money = { type: Number, default: 0, min: 0 };
 export const str = { type: String, default: "", trim: true };
 export const photos = { type: [String], default: [] };
+/** 上傳的檔案（PDF、Excel…），見 types.ts 的 StoredFile */
+export const files = {
+  type: [new Schema({ url: { type: String, required: true }, name: str, size: money, type: str }, sub)],
+  default: [],
+};
 export const orchardRef = { type: String, ref: "Orchard", required: true, index: true };
 
 export const AttendanceSchema = new Schema(

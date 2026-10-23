@@ -3,7 +3,7 @@ import { connectDB } from "./mongodb";
 import { COLLECTIONS, FILTERS, ORCHARD_CHILDREN, SORT, type CollectionName } from "./collections";
 import { HttpError, fromClient, toClient } from "./api";
 import { todayStr, uid } from "./utils";
-import { assertNoInlineImages, collectBlobUrls, deleteBlobs } from "./blob";
+import { assertNoInlineImages, collectFileUrls, deleteFiles } from "./storage";
 import type { DB } from "./types";
 import { OrchardModel } from "@/models/orchard";
 import { EmployeeModel } from "@/models/people";
@@ -121,12 +121,12 @@ export async function saveDoc(
     return { doc: toClient(created.toObject()), created: true };
   }
   opts.beforeUpdate?.(doc.toObject() as Data, data); // 例如檢查修改用的驗證碼
-  const before = collectBlobUrls(doc.toObject());
+  const before = collectFileUrls(doc.toObject());
   doc.overwrite(data);
   await doc.save();
   // 刪掉這次編輯移除的照片
-  const after = collectBlobUrls(data);
-  await deleteBlobs([...before].filter((u) => !after.has(u)));
+  const after = collectFileUrls(data);
+  await deleteFiles([...before].filter((u) => !after.has(u)));
   return { doc: toClient(doc.toObject()), created: false };
 }
 
@@ -149,7 +149,7 @@ export async function deleteDoc(
   opts.beforeDelete?.(existing as Data); // 例如檢查刪除用的驗證碼
   const backup = isTrashCollection(name);
   if (backup) await TrashModel.create({ collectionName: name, docId: id, data: existing, deletedBy: opts.deletedBy ?? "" });
-  const photos = backup ? new Set<string>() : collectBlobUrls(existing);
+  const photos = backup ? new Set<string>() : collectFileUrls(existing);
 
   if (name === "orchards") {
     const counts = Object.fromEntries(
@@ -165,7 +165,7 @@ export async function deleteDoc(
       });
     }
     for (const c of ORCHARD_CHILDREN) {
-      collectBlobUrls(await COLLECTIONS[c].find({ orchardId: id }).lean(), photos);
+      collectFileUrls(await COLLECTIONS[c].find({ orchardId: id }).lean(), photos);
     }
     await Promise.all(ORCHARD_CHILDREN.map((c) => COLLECTIONS[c].deleteMany({ orchardId: id })));
   }
@@ -173,7 +173,7 @@ export async function deleteDoc(
   if (name === "materials") await StockModel.deleteMany({ materialId: id });
 
   await Model.deleteOne({ _id: id });
-  await deleteBlobs(photos);
+  await deleteFiles(photos);
 }
 
 /* ---------------- 已刪除紀錄（trash） ---------------- */
@@ -208,7 +208,7 @@ export async function purgeTrash(id: string) {
   await connectDB();
   const t = await findTrash(id);
   await TrashModel.deleteOne({ _id: id });
-  await deleteBlobs(collectBlobUrls(t.data));
+  await deleteFiles(collectFileUrls(t.data));
 }
 
 /** 一次取得全部資料（前端啟動時載入） */

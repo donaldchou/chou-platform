@@ -1,4 +1,4 @@
-import type { Attendance, Material, MaterialUnit, Orchard } from "./types";
+import type { Attendance, Material, MaterialUnit, Orchard, StoredFile } from "./types";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -160,17 +160,90 @@ export function compressImage(file: File, max = 1600): Promise<Blob> {
   });
 }
 
-/** 把 MongoDB 中的 Blob 檔案網址轉成 <img> 可用的網址（私人 store 要經過 /api/photo） */
-export const photoSrc = (url: string) =>
-  url.includes(".blob.vercel-storage.com/") ? `/api/photo?url=${encodeURIComponent(url)}` : url;
+/** 照片／檔案存在 ll3 主機（ll3:...）或舊的 Vercel Blob，都不能直接開啟，要經過 /api/photo */
+const isStored = (url: string) => url.startsWith("ll3:") || url.includes(".blob.vercel-storage.com/");
 
-/** 上傳照片到 Vercel Blob（經由 /api/upload），回傳照片網址 */
+/** 把 MongoDB 中的照片網址轉成 <img> 可用的網址 */
+export const photoSrc = (url: string) => (isStored(url) ? `/api/photo?url=${encodeURIComponent(url)}` : url);
+
+/** 上傳、下載都分段，每段 3MB（Vercel 請求／回應上限約 4.5MB，同 /api/file 的 FILE_PART） */
+const FILE_PART = 3 * 1024 * 1024;
+
+/** 上傳檔案到 ll3 主機（經由 /api/upload，大檔案分段送），回傳要存進 MongoDB 的資料 */
+export async function uploadFile(
+  file: Blob,
+  name: string,
+  folder: string,
+  onProgress?: (ratio: number) => void,
+): Promise<StoredFile> {
+  const uploadId = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const parts = Math.max(1, Math.ceil(file.size / FILE_PART));
+  let data: StoredFile & { error?: string } = { url: "", name, size: file.size, type: file.type };
+  for (let i = 0; i < parts; i++) {
+    const form = new FormData();
+    form.append("file", file.slice(i * FILE_PART, (i + 1) * FILE_PART), "part");
+    form.append("uploadId", uploadId);
+    form.append("index", String(i));
+    form.append("last", i === parts - 1 ? "1" : "0");
+    form.append("name", name);
+    form.append("size", String(file.size));
+    form.append("folder", folder);
+    const res = await fetch("/api/upload", { method: "POST", body: form });
+    data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error ?? `上傳失敗（HTTP ${res.status}）`);
+    onProgress?.((i + 1) / parts);
+  }
+  return { url: data.url, name: data.name, size: data.size, type: data.type };
+}
+
+/** 上傳照片（先在瀏覽器壓縮），回傳照片網址 */
 export async function uploadPhoto(file: File, folder = "photos"): Promise<string> {
-  const form = new FormData();
-  form.append("file", await compressImage(file), "photo.jpg");
-  form.append("folder", folder);
-  const res = await fetch("/api/upload", { method: "POST", body: form });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `上傳失敗（HTTP ${res.status}）`);
-  return data.url as string;
+  return (await uploadFile(await compressImage(file), "photo.jpg", folder)).url;
+}
+
+/** 分段讀取 ll3 主機上的檔案，組成一個 Blob */
+export async function fetchStoredFile(f: StoredFile): Promise<Blob> {
+  const parts: Blob[] = [];
+  let got = 0;
+  for (let i = 0; ; i++) {
+    const res = await fetch(`/api/file?url=${encodeURIComponent(f.url)}&part=${i}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? `讀取檔案失敗（HTTP ${res.status}）`);
+    }
+    const total = Number(res.headers.get("x-file-size") ?? 0);
+    const b = await res.blob();
+    parts.push(b);
+    got += b.size;
+    if (!b.size || got >= total) break;
+  }
+  return new Blob(parts, { type: f.type });
+}
+
+/** 開啟檔案：PDF／圖片開新分頁，其他（Excel、Word…）下載 */
+export async function openStoredFile(f: StoredFile) {
+  const view = f.type === "application/pdf" || f.type.startsWith("image/");
+  // 要在點擊當下開視窗，等下載完才開會被擋
+  const win = view ? window.open("", "_blank") : null;
+  if (win) win.document.title = `讀取中… ${f.name}`;
+  try {
+    const href = URL.createObjectURL(await fetchStoredFile(f));
+    if (win) win.location.href = href;
+    else {
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = f.name;
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(href), 60_000);
+  } catch (err) {
+    win?.close();
+    alert(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export function fileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

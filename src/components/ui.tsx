@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ImagePlus, Pencil, Trash2, X } from "lucide-react";
+import { ChevronDown, FilePlus, FileText, ImagePlus, Pencil, Trash2, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Lightbox } from "./lightbox";
 import { UnlockTimer, isCodePage } from "./unlock";
 import { useCanEdit } from "@/lib/store";
-import { photoSrc, uploadPhoto } from "@/lib/utils";
+import type { StoredFile } from "@/lib/types";
+import { fileSize, openStoredFile, photoSrc, uploadFile, uploadPhoto } from "@/lib/utils";
 
 export { Lightbox };
 
@@ -536,7 +537,7 @@ export function PhotoUpload({
   value: string[];
   onChange: (v: string[]) => void;
   max?: number;
-  /** Vercel Blob 裡的資料夾名稱，例如 orchards、bills */
+  /** ll3 主機上的資料夾名稱，例如 orchards、bills */
   folder?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -593,6 +594,90 @@ export function PhotoUpload({
         onChange={(e) => onFiles(e.target.files)}
       />
       {preview !== null && <Lightbox photos={value} start={preview} onClose={() => setPreview(null)} />}
+    </div>
+  );
+}
+
+/** 上傳檔案時可選的類型（要跟 storage.ts 的 FILE_TYPES 一致） */
+const FILE_ACCEPT = ".pdf,.xls,.xlsx,.doc,.docx,.csv,.txt,.zip,.jpg,.jpeg,.png,.webp,.gif";
+
+/** 檔案清單，點檔名開啟（PDF 開新分頁，其他下載） */
+export function FileList({ files, onRemove }: { files: StoredFile[]; onRemove?: (i: number) => void }) {
+  return (
+    <ul className="space-y-1">
+      {files.map((f, i) => (
+        <li key={f.url} className="flex items-center gap-2 rounded-lg border border-stone-200 px-2 py-1.5 text-sm">
+          <FileText size={16} className="shrink-0 text-stone-400" />
+          <button
+            type="button"
+            onClick={() => openStoredFile(f)}
+            className="min-w-0 flex-1 truncate text-left text-emerald-700 hover:underline"
+            title={f.name}
+          >
+            {f.name}
+          </button>
+          <span className="shrink-0 text-xs text-stone-400">{fileSize(f.size)}</span>
+          {onRemove && (
+            <button type="button" onClick={() => onRemove(i)} className="shrink-0 text-stone-400 hover:text-red-600" aria-label="移除檔案">
+              <X size={16} />
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function FileUpload({
+  value,
+  onChange,
+  max = 20,
+  folder = "files",
+}: {
+  value: StoredFile[];
+  onChange: (v: StoredFile[]) => void;
+  max?: number;
+  /** ll3 主機上的資料夾名稱，例如 contracts */
+  folder?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+
+  async function onFiles(list: FileList | null) {
+    if (!list?.length) return;
+    const added: StoredFile[] = [];
+    const picked = [...list].slice(0, max - value.length);
+    for (const [k, f] of picked.entries()) {
+      try {
+        added.push(
+          await uploadFile(f, f.name, folder, (r) =>
+            setProgress(`${picked.length > 1 ? `${k + 1}/${picked.length} ` : ""}${Math.round(r * 100)}%`),
+          ),
+        );
+      } catch (err) {
+        alert(`「${f.name}」上傳失敗：${err instanceof Error ? err.message : err}`);
+      }
+    }
+    setProgress(null);
+    if (added.length) onChange([...value, ...added]);
+    if (ref.current) ref.current.value = "";
+  }
+
+  return (
+    <div className="space-y-2">
+      {value.length > 0 && <FileList files={value} onRemove={(i) => onChange(value.filter((_, j) => j !== i))} />}
+      {value.length < max && (
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          disabled={progress !== null}
+          className="flex items-center gap-1.5 rounded-lg border-2 border-dashed border-stone-300 px-3 py-2 text-sm text-stone-500 hover:border-emerald-500 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60"
+        >
+          <FilePlus size={16} />
+          {progress !== null ? `上傳中… ${progress}` : "上傳檔案（PDF、Excel、Word…）"}
+        </button>
+      )}
+      <input ref={ref} type="file" accept={FILE_ACCEPT} multiple hidden onChange={(e) => onFiles(e.target.files)} />
     </div>
   );
 }

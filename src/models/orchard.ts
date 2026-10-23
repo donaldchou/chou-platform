@@ -1,6 +1,6 @@
 import { Schema } from "mongoose";
 import { LAND_TYPES } from "@/lib/types";
-import { defineModel, idField, money, photos, str, sub, ymd } from "./_shared";
+import { defineModel, files, idField, money, photos, str, sub, ymd } from "./_shared";
 
 const ParcelSchema = new Schema(
   {
@@ -46,6 +46,7 @@ const OrchardSchema = new Schema({
     start: ymd,
     end: { ...ymd, index: true }, // 到期提醒會用這個欄位查詢
     photos,
+    files, // 合約檔案（PDF 等）
   },
   trees: {
     五月桃: money,

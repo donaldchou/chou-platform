@@ -13,6 +13,7 @@ import {
   Card,
   Empty,
   PageHeader,
+  FileList,
   Gallery,
   StatCard,
 } from "@/components/ui";
@@ -236,6 +237,11 @@ export default function OrchardDetail() {
             {o.contract.photos.length > 0 && (
               <div className="mt-3">
                 <Gallery photos={o.contract.photos} />
+              </div>
+            )}
+            {(o.contract.files ?? []).length > 0 && (
+              <div className="mt-3">
+                <FileList files={o.contract.files} />
               </div>
             )}
           </Card>

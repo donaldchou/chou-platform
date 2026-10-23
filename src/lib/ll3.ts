@@ -74,11 +74,20 @@ export const ll3Stat = (path: string) => call<{ exists: boolean; size?: number }
 
 export const ll3Delete = (path: string) => call<object>("del", { p: path });
 
-/** 把一段資料切成 LL3_CHUNK 大小依序送出，塊號從 firstN 開始 */
+/** 同時送出的塊數：Vercel 在美國，每塊往返台灣約 0.7 秒，一塊一塊送太慢 */
+const PARALLEL = 4;
+
+/** 把一段資料切成 LL3_CHUNK 大小送出（同時送 PARALLEL 塊），塊號從 firstN 開始 */
 export async function ll3PutAll(id: string, bytes: Uint8Array, firstN = 0) {
-  for (let i = 0, n = firstN; i < bytes.length; i += LL3_CHUNK, n++) {
-    await ll3Put(id, n, bytes.subarray(i, i + LL3_CHUNK));
-  }
+  const count = Math.ceil(bytes.length / LL3_CHUNK);
+  let next = 0;
+  const worker = async () => {
+    while (next < count) {
+      const k = next++;
+      await ll3Put(id, firstN + k, bytes.subarray(k * LL3_CHUNK, (k + 1) * LL3_CHUNK));
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(PARALLEL, count) }, worker));
 }
 
 /** 讀檔（可指定範圍）。回傳主機的 Response，body 直接轉給瀏覽器 */

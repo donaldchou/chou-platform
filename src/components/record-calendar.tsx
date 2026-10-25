@@ -16,43 +16,53 @@ type Rec = SprayingRecord | FertilizingRecord;
 
 const splitOther = (s: string) => s.split(/[、,，\s]+/).filter(Boolean);
 
-/* ---------------- 顯示方式（清單／日曆／年曆），每個頁面各自記在這台電腦的瀏覽器 ---------------- */
+/* ---------------- 顯示方式（清單／日曆／年曆）、篩選的果園，每個頁面各自記在這台電腦的瀏覽器 ---------------- */
 const VIEWS: RecordsView[] = ["list", "calendar", "month"];
-const viewKey = (page: string) => `chou-${page}-view`;
-const viewListeners = new Set<() => void>();
-const memoryViews = new Map<string, RecordsView>();
+const savedListeners = new Set<() => void>();
+const memorySaved = new Map<string, string>();
 
-function readView(page: string): RecordsView {
-  const saved = memoryViews.get(page);
-  if (saved) return saved;
+function readSaved(key: string): string | null {
+  const saved = memorySaved.get(key);
+  if (saved !== undefined) return saved;
   try {
-    const v = localStorage.getItem(viewKey(page)) as RecordsView;
-    return VIEWS.includes(v) ? v : "list";
+    return localStorage.getItem(key);
   } catch {
-    return "list";
+    return null;
   }
 }
 
-function writeView(page: string, v: RecordsView) {
+function writeSaved(key: string, v: string) {
   try {
-    localStorage.setItem(viewKey(page), v);
+    localStorage.setItem(key, v);
   } catch {
     // 無法儲存（例如無痕模式）時，只在這次瀏覽有效
   }
-  memoryViews.set(page, v);
-  viewListeners.forEach((l) => l());
+  memorySaved.set(key, v);
+  savedListeners.forEach((l) => l());
+}
+
+function useSaved(key: string): [string | null, (v: string) => void] {
+  const value = useSyncExternalStore(
+    (l) => {
+      savedListeners.add(l);
+      return () => savedListeners.delete(l);
+    },
+    () => readSaved(key),
+    () => null,
+  );
+  return [value, (v) => writeSaved(key, v)];
 }
 
 function useSavedView(page: string): [RecordsView, (v: RecordsView) => void] {
-  const view = useSyncExternalStore(
-    (l) => {
-      viewListeners.add(l);
-      return () => viewListeners.delete(l);
-    },
-    () => readView(page),
-    () => "list" as RecordsView,
-  );
-  return [view, (v) => writeView(page, v)];
+  const [v, set] = useSaved(`chou-${page}-view`);
+  return [VIEWS.includes(v as RecordsView) ? (v as RecordsView) : "list", set];
+}
+
+/** 篩選的果園；存的果園已被刪除時當作「全部果園」 */
+function useSavedOrchard(page: string): [string, (id: string) => void] {
+  const db = useDB();
+  const [v, set] = useSaved(`chou-${page}-orchard`);
+  return [v && db.orchards.some((o) => o.id === v) ? v : "", set];
 }
 
 /**
@@ -72,7 +82,7 @@ export function useRecordsFilter(page: "spraying" | "fertilizing") {
   const inYear = (r: { datetime: string }) => r.datetime.startsWith(String(year));
 
   const [q, setQ] = useState("");
-  const [orchardId, setOrchardId] = useState("");
+  const [orchardId, setOrchardId] = useSavedOrchard(page);
   const [target, setTarget] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const filtering = !!(q.trim() || orchardId || target || employeeId);

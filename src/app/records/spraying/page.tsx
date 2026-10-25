@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AlertTriangle, Plus, Printer, Share2 } from "lucide-react";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
 import { targetsText, targetsTextEn } from "@/components/record-parts";
-import { Button, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } from "@/components/ui";
+import { Button, Modal, PageHeader, PrintArea, RowActions, SaveJpgButton, Table, Td, Thumb } from "@/components/ui";
 import { STAGES } from "@/lib/spray-advice";
 import { useDB } from "@/lib/store";
 import type { SprayingRecord } from "@/lib/types";
@@ -99,6 +99,7 @@ export default function SprayingPage() {
 function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose: () => void }) {
   const db = useDB();
   const o = db.orchards.find((x) => x.id === r.orchardId);
+  const cardRef = useRef<HTMLDivElement>(null);
   return (
     <Modal
       open
@@ -108,10 +109,11 @@ function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose
         <>
           <Button variant="secondary" onClick={onClose}>關閉</Button>
           <Button onClick={() => window.print()}><Printer size={16} /> 列印／存成 PDF</Button>
+          <SaveJpgButton target={cardRef} filename={`噴藥工作單_${o?.nameZh ?? ""}_${r.datetime.slice(0, 10)}`} />
         </>
       }
     >
-      <PrintArea className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
+      <PrintArea ref={cardRef} className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
         <div>
           <div className="text-xs text-stone-500">噴藥工作單</div>
           {/* 果園、藥品名稱：中文一行、英文一行（給外籍員工看） */}
@@ -122,7 +124,7 @@ function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div><b>對象 Target：</b>{targetsTextEn(r.targets, r.otherTarget)}</div>
           <div><b>生長期：</b>{r.stage || "—"}</div>
-          <div className="col-span-2 rounded-lg bg-sky-50 p-2 text-base"><b>用水量：</b>{r.waterLiters} 公升</div>
+          <div className="col-span-2 rounded-lg bg-sky-50 p-2 text-base"><b>用水量：</b>{r.waterLiters} 公升 (Water：{r.waterLiters}L)</div>
         </div>
         <div>
           <div className="mb-1 text-sm font-semibold">依序加入</div>
@@ -158,7 +160,7 @@ function ReferenceCard({ record: r, onClose }: { record: SprayingRecord; onClose
           {r.employeeIds.map((id) => db.employees.find((e) => e.id === id)?.name).filter(Boolean).join("、") || "—"}
         </div>
       </PrintArea>
-      <p className="mt-3 text-xs text-stone-500">可列印或存成 PDF 後透過 LINE 傳給員工。</p>
+      <p className="mt-3 text-xs text-stone-500">可列印、存成 PDF 或 JPG 後透過 LINE 傳給員工。</p>
     </Modal>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Printer, Share2 } from "lucide-react";
 import { useDB } from "@/lib/store";
 import type { FertilizingRecord } from "@/lib/types";
@@ -9,7 +9,7 @@ import { useFertCost } from "@/components/fert-modal";
 import { useRecordActions } from "@/components/record-actions";
 import { RecordCalendar, RecordFilters, RecordsToolbar, useRecordsFilter } from "@/components/record-calendar";
 import { targetsText, targetsTextEn } from "@/components/record-parts";
-import { Button, Gallery, Modal, PageHeader, PrintArea, RowActions, Table, Td, Thumb } from "@/components/ui";
+import { Button, Gallery, Modal, PageHeader, PrintArea, RowActions, SaveJpgButton, Table, Td, Thumb } from "@/components/ui";
 
 export default function FertilizingPage() {
   const db = useDB();
@@ -100,6 +100,7 @@ export default function FertilizingPage() {
 function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onClose: () => void }) {
   const db = useDB();
   const o = db.orchards.find((x) => x.id === r.orchardId);
+  const cardRef = useRef<HTMLDivElement>(null);
   return (
     <Modal
       open
@@ -109,10 +110,11 @@ function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onCl
         <>
           <Button variant="secondary" onClick={onClose}>關閉</Button>
           <Button onClick={() => window.print()}><Printer size={16} /> 列印／存成 PDF</Button>
+          <SaveJpgButton target={cardRef} filename={`施肥工作單_${o?.nameZh ?? ""}_${r.datetime.slice(0, 10)}`} />
         </>
       }
     >
-      <PrintArea className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
+      <PrintArea ref={cardRef} className="space-y-4 rounded-xl border-2 border-emerald-600 bg-white p-5">
         <div>
           <div className="text-xs text-stone-500">施肥工作單</div>
           {/* 果園、肥料名稱：中文一行、英文一行（給外籍員工看） */}
@@ -122,7 +124,7 @@ function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onCl
         </div>
         <div className="text-sm"><b>對象 Target：</b>{targetsTextEn(r.targets, r.otherTarget)}</div>
         {r.waterLiters > 0 && (
-          <div className="rounded-lg bg-sky-50 p-2 text-base"><b>用水量 Water：</b>{r.waterLiters} 公升 L</div>
+          <div className="rounded-lg bg-sky-50 p-2 text-base"><b>用水量：</b>{r.waterLiters} 公升 (Water：{r.waterLiters}L)</div>
         )}
         <div className="space-y-1">
           {r.items.map((it, i) => {
@@ -158,7 +160,7 @@ function ReferenceCard({ record: r, onClose }: { record: FertilizingRecord; onCl
           </div>
         )}
       </PrintArea>
-      <p className="mt-3 text-xs text-stone-500">可列印或存成 PDF 後透過 LINE 傳給員工。</p>
+      <p className="mt-3 text-xs text-stone-500">可列印、存成 PDF 或 JPG 後透過 LINE 傳給員工。</p>
     </Modal>
   );
 }

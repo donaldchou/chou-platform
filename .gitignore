@@ -42,3 +42,4 @@ next-env.d.ts
 
 # 規格文件（不上傳）
 規格_*
+/chou-platform-backup/

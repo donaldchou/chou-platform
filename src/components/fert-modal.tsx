@@ -80,6 +80,7 @@ export function FertModal({ record, code, onClose }: { record: FertilizingRecord
     value: m.id,
     label: materialName(m),
     keywords: `${m.manufacturer ?? ""} ${m.targets}`,
+    photo: m.photos?.[0],
   }));
   const c = cost(r);
 

@@ -195,8 +195,15 @@ export function SaveJpgButton({ target, filename }: { target: React.RefObject<HT
   );
 }
 
-/** groupClass：分組標題的文字顏色（Tailwind class），預設灰色 */
-export type SearchOption = { value: string; label: string; group?: string; groupClass?: string; keywords?: string };
+/** groupClass：分組標題的文字顏色（Tailwind class），預設灰色；photo：選單裡顯示的參考照片 */
+export type SearchOption = {
+  value: string;
+  label: string;
+  group?: string;
+  groupClass?: string;
+  keywords?: string;
+  photo?: string;
+};
 
 /**
  * 可以打字搜尋的下拉選單：點開後輸入關鍵字（空白分隔可多個）即時篩選，
@@ -218,6 +225,7 @@ export function SearchSelect({
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const current = options.find((o) => o.value === value);
+  const withPhotos = options.some((o) => o.photo);
 
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shown = options.filter((o) => {
@@ -294,14 +302,29 @@ export function SearchSelect({
                   (document.activeElement as HTMLElement | null)?.blur();
                 }}
                 onMouseEnter={() => setActive(i)}
-                className={`block w-full px-3 py-1.5 text-left text-sm ${
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
                   i === active ? "bg-emerald-50 text-emerald-800" : "text-stone-700"
                 } ${o.value === value ? "font-semibold" : ""}`}
               >
+                {withPhotos &&
+                  (o.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoSrc(o.photo)} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                  ) : (
+                    <span className="h-10 w-10 shrink-0 rounded-md bg-stone-100" />
+                  ))}
                 {o.label}
               </button>
             </div>
           ))}
+        </div>
+      )}
+      {/* 桌機：清單右側放大顯示目前停留項目的照片 */}
+      {open && shown[active]?.photo && (
+        <div className="pointer-events-none absolute left-full top-0 z-20 ml-2 hidden w-56 rounded-lg border border-stone-200 bg-white p-1 shadow-lg sm:block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoSrc(shown[active].photo)} alt="" className="max-h-72 w-full rounded-md object-contain" />
+          <p className="px-1 pt-1 text-xs text-stone-600">{shown[active].label}</p>
         </div>
       )}
     </div>

@@ -35,6 +35,7 @@ import {
   SectionTitle,
   Select,
   Textarea,
+  Thumb,
   type SearchOption,
 } from "./ui";
 
@@ -53,6 +54,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
     label: materialName(m),
     group,
     keywords: `${m.manufacturer ?? ""} ${m.targets}`,
+    photo: m.photos?.[0],
   });
   const materialOptions = [...pesticides.map(toOption("農藥")), ...ferts.map(toOption("肥料"))];
 
@@ -216,7 +218,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
             set("items", r.items.map((x) => (x.id === it.id ? { ...x, ...patch } : x)));
           return (
             <div key={it.id} className="rounded-lg bg-stone-100 p-2">
-              <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[auto_2fr_1fr_0.8fr_1fr_auto]">
+              <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[auto_auto_2fr_1fr_0.8fr_1fr_auto]">
                 <div className="flex items-center gap-1 pb-1">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white">{i + 1}</span>
                   <div className="flex flex-col">
@@ -224,6 +226,7 @@ export function SprayModal({ record, code, onClose }: { record: SprayingRecord; 
                     <button disabled={i === r.items.length - 1} onClick={() => move(i, 1)} className="text-stone-500 disabled:opacity-20" title="往後"><ArrowDown size={14} /></button>
                   </div>
                 </div>
+                <Thumb src={m?.photos?.[0]} photos={m?.photos} showCount className="h-10 w-10" />
                 <Field label="藥品／肥料品牌">
                   <SearchSelect
                     value={it.materialId}

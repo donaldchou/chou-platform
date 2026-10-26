@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Eye, KeyRound, Plus, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useCodeGate } from "@/components/code-modal";
+import { PageAccessPanel } from "@/components/page-access-panel";
 import { UnlockPanel } from "@/components/unlock-panel";
 import {
   Badge,
@@ -20,10 +21,10 @@ import { reload, useDB, useMe } from "@/lib/store";
 import type { DB } from "@/lib/types";
 import { fileSize, openStoredFile, photoSrc } from "@/lib/utils";
 
-type Tab = "users" | "data" | "trash" | "files";
+type Tab = "users" | "access" | "data" | "trash" | "files";
 
 /* ---------------- 目前分頁，記在這台電腦的瀏覽器（重新整理後保留） ---------------- */
-const TABS: Tab[] = ["users", "data", "trash", "files"];
+const TABS: Tab[] = ["users", "access", "data", "trash", "files"];
 const TAB_KEY = "chou-admin-tab";
 const tabListeners = new Set<() => void>();
 let memoryTab: Tab | null = null;
@@ -66,7 +67,7 @@ export default function AdminPage() {
     <>
       <PageHeader
         title="後台管理"
-        desc="管理登入帳號、檢視與刪除資料庫裡的所有資料，以及還原已刪除的噴藥／施肥紀錄。只有管理者看得到這一頁。"
+        desc="管理登入帳號與一般使用者可以看的頁面、檢視與刪除資料庫裡的所有資料，以及還原已刪除的噴藥／施肥紀錄。只有管理者看得到這一頁。"
       />
       <UnlockPanel />
       <Tabs<Tab>
@@ -74,12 +75,23 @@ export default function AdminPage() {
         onChange={setTab}
         tabs={[
           { value: "users", label: "使用者管理" },
+          { value: "access", label: "頁面權限" },
           { value: "data", label: "所有資料" },
           { value: "trash", label: "已刪除紀錄" },
           { value: "files", label: "清理未使用的檔案" },
         ]}
       />
-      {tab === "users" ? <UsersTab /> : tab === "data" ? <DataTab /> : tab === "trash" ? <TrashTab /> : <FilesTab />}
+      {tab === "users" ? (
+        <UsersTab />
+      ) : tab === "access" ? (
+        <PageAccessPanel />
+      ) : tab === "data" ? (
+        <DataTab />
+      ) : tab === "trash" ? (
+        <TrashTab />
+      ) : (
+        <FilesTab />
+      )}
     </>
   );
 }

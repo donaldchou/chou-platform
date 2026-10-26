@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import type { PageKey } from "./page-access";
 import type { DB } from "./types";
 
 // 前端資料快取：啟動時從 /api/db 載入，寫入時先更新畫面（樂觀更新）再送到後端。
@@ -77,7 +78,8 @@ const codeHeader = (code?: string): Record<string, string> =>
   code === undefined ? {} : { "x-verify-code": encodeURIComponent(code) };
 
 /* ---------------- 目前登入的使用者 ---------------- */
-export type Me = { id: string; email: string; name: string; role: "admin" | "user" };
+/** pages：這個帳號看得到的頁面（管理者是全部） */
+export type Me = { id: string; email: string; name: string; role: "admin" | "user"; pages: PageKey[] };
 let me: Me | null = null;
 let meLoading = false;
 const meListeners = new Set<() => void>();
@@ -108,7 +110,13 @@ export function useMe(): Me | null {
 /** 只有管理者可以新增、修改、刪除；一般使用者只能看 */
 export const useCanEdit = () => useMe()?.role === "admin";
 
-/* ---------------- 驗證碼解鎖（後台輸入一次，1 小時內免輸入） ---------------- */
+/** 看不看得到某個頁面（後台「頁面權限」設定）；還沒載入完先當作看得到，避免畫面閃動 */
+export function useCanSee() {
+  const me = useMe();
+  return (page: PageKey) => !me || me.role === "admin" || (me.pages ?? []).includes(page);
+}
+
+/* ---------------- 驗證碼解鎖（後台輸入一次，選定的時數內免輸入） ---------------- */
 let unlockUntil: number | null = null; // 到期時間（毫秒）
 let unlockLoaded = false;
 const unlockListeners = new Set<() => void>();
@@ -147,9 +155,9 @@ export function useUnlock(): number | null {
 /** 現在是否在解鎖期間（給非 React 的程式用） */
 export const isUnlocked = () => !!unlockUntil && unlockUntil > Date.now();
 
-export async function unlock(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function unlock(code: string, hours: number): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const { expiresAt } = await api<{ expiresAt: number }>("/api/unlock", { method: "POST", body: JSON.stringify({ code }) });
+    const { expiresAt } = await api<{ expiresAt: number }>("/api/unlock", { method: "POST", body: JSON.stringify({ code, hours }) });
     setUnlock(expiresAt);
     return { ok: true };
   } catch (e) {

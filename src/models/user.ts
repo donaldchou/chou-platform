@@ -23,6 +23,7 @@ const UserSchema = new Schema(
     name: str,
     role: { type: String, enum: USER_ROLES, default: "user" }, // 身分：admin＝管理者、user＝一般使用者
     active: { type: Boolean, default: true }, // 停用的帳號不能登入
+    hiddenPages: { type: [String], default: [] }, // 一般使用者：在「一般使用者可以看的頁面」之外，這個帳號另外看不到的頁面
     lastLoginAt: { type: Date, default: null },
   },
   { timestamps: true },

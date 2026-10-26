@@ -34,7 +34,12 @@ export function useRemaining(until: number | null) {
   return until ? Math.max(0, Math.ceil((until - now) / 1000)) : 0;
 }
 
-export const mmss =(s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+/** 倒數：1 小時以上顯示 時:分:秒，否則 分:秒 */
+export const mmss = (s: number) => {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const h = Math.floor(s / 3600);
+  return `${h ? `${h}:` : ""}${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+};
 
 /** 頁面標題後面的小提示：解鎖中顯示倒數，沒解鎖時提示可到後台解鎖 */
 export function UnlockTimer() {
@@ -59,7 +64,7 @@ export function UnlockTimer() {
       <Lock size={15} />
       新增／修改／刪除需輸入驗證碼
       <Link href="/admin" className="text-xs text-emerald-700 underline hover:text-emerald-900">
-        到後台解鎖 1 小時
+        到後台解鎖
       </Link>
     </div>
   );

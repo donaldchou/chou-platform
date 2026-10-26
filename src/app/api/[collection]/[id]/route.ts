@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { HttpError, handleError, readJson } from "@/lib/api";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requireCollection } from "@/lib/access";
+import { requireAdmin } from "@/lib/auth";
 import { assertCode, readCode } from "@/lib/codes";
 import { isCollection } from "@/lib/collections";
 import { deleteDoc, getDoc, saveDoc } from "@/lib/repo";
@@ -16,8 +17,8 @@ async function paramsOf(ctx: Ctx) {
 /** GET /api/<collection>/<id> */
 export async function GET(_req: NextRequest, ctx: Ctx) {
   try {
-    await requireUser();
     const { name, id } = await paramsOf(ctx);
+    await requireCollection(name);
     return NextResponse.json(await getDoc(name, id));
   } catch (err) {
     return handleError(err);

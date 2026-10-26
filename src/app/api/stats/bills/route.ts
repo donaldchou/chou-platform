@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { HttpError, handleError } from "@/lib/api";
-import { requireUser } from "@/lib/auth";
+import { requireCollection } from "@/lib/access";
 import { todayStr } from "@/lib/utils";
 import { BillModel } from "@/models/records";
 
@@ -10,7 +10,7 @@ import { BillModel } from "@/models/records";
  */
 export async function GET(req: NextRequest) {
   try {
-    await requireUser();
+    await requireCollection("bills");
     const p = req.nextUrl.searchParams;
     const kind = p.get("kind");
     if (kind !== "water" && kind !== "electricity") throw new HttpError(400, "kind 必須是 water 或 electricity");

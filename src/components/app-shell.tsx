@@ -17,6 +17,7 @@ import {
   Globe,
   LayoutDashboard,
   Leaf,
+  Lock,
   LogOut,
   Menu,
   Package,
@@ -34,6 +35,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { pageHref, pageLabel, pageOfPath, USER_PAGES } from "@/lib/page-access";
 import { logout, reload, useDBStatus, useMe } from "@/lib/store";
 
 const NAV = [
@@ -187,7 +189,17 @@ function Shell({ pathname, children }: { pathname: string; children: React.React
   const [collapsed, setCollapsed] = useCollapsed();
   const [closedGroups, toggleGroup, toggleAllGroups] = useClosedGroups();
   const me = useMe();
-  const groups = me?.role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
+  // 一般使用者：只顯示後台「頁面權限」開給他的頁面；還沒載入完先全部顯示
+  const groups =
+    me?.role === "admin"
+      ? [...NAV, ADMIN_NAV]
+      : NAV.map((g) => ({
+          ...g,
+          items: g.items.filter((it) => {
+            const page = pageOfPath(it.href);
+            return !me || !page || (me.pages ?? []).includes(page);
+          }),
+        })).filter((g) => g.items.length);
   const roleLabel = me ? (me.role === "admin" ? "管理者" : "一般使用者（唯讀）") : "";
   const allClosed = groups.every((g) => closedGroups.has(g.group));
 
@@ -333,9 +345,35 @@ function Shell({ pathname, children }: { pathname: string; children: React.React
         {/* 內容用滿寬度，左右只留少量空白 */}
         <main className="px-3 py-4 sm:px-4 lg:py-5 lg:pr-5">
           <DBStatusBanner />
-          {children}
+          <PageGuard pathname={pathname}>{children}</PageGuard>
         </main>
       </div>
+    </div>
+  );
+}
+
+/** 後台「頁面權限」沒開給這個帳號的頁面：不顯示內容，改列出看得到的頁面（資料 API 也會擋，這裡只是畫面） */
+function PageGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
+  const me = useMe();
+  const page = pageOfPath(pathname);
+  if (!me || me.role === "admin" || !page || (me.pages ?? []).includes(page)) return <>{children}</>;
+  const pages = USER_PAGES.filter((p) => me.pages.includes(p.key));
+  return (
+    <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+      <Lock size={32} className="mx-auto text-stone-400" />
+      <h1 className="mt-3 text-xl font-bold text-stone-800">你的帳號沒有權限查看「{pageLabel(page)}」</h1>
+      <p className="mt-1 text-sm text-stone-500">需要這個頁面請聯絡管理者。</p>
+      {pages.length > 0 ? (
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          {pages.map((p) => (
+            <Link key={p.key} href={pageHref(p.key)} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800 hover:bg-emerald-100">
+              {p.label}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-5 text-sm text-amber-700">目前沒有開放任何頁面給你的帳號。</p>
+      )}
     </div>
   );
 }

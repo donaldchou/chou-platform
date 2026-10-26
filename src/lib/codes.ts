@@ -107,7 +107,7 @@ function ruleFor(collection: string, action: CodeAction, docs: Doc[]) {
 export const needsCode = (collection: string, action: CodeAction, docs: Doc[] = []) =>
   !!ruleFor(collection, action, docs);
 
-/** 這次請求帶的驗證碼，以及是否在後台解鎖的 1 小時內 */
+/** 這次請求帶的驗證碼，以及是否在後台解鎖的時數內 */
 export type CodeInput = { code: string; unlocked: boolean };
 
 /** 從 header 取出驗證碼（前端用 encodeURIComponent 送出，避免中文無法放進 header），並檢查解鎖 cookie */

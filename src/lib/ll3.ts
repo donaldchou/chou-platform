@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { HttpError } from "./api";
 
 /**
- * ll3 主機的檔案 API（http://www.ll3.com.tw/platform/file_api.asp，原始碼在 chou-suda-print\platform_change_code）。
+ * ll3 主機的檔案 API（https://www.ll3.com.tw/platform/file_api.asp，2026-11-04 起主機有 SSL，原始碼在 chou-suda-print\platform_change_code）。
  * 檔案存在主機的 /platform/chou_platform/<folder>/<name>，MongoDB 存 "ll3:<folder>/<name>"。
  * 每個請求都用共用金鑰簽章：HMAC-SHA256(LL3_FILE_KEY, a|p|id|n|size|ts)，ts 是 UTC 秒數，10 分鐘內有效。
  */
@@ -15,7 +15,7 @@ export const LL3_PATH = /^[a-z0-9-]{1,40}\/[A-Za-z0-9_-]{1,100}\.[a-z0-9]{1,5}$/
 export const isLl3Url = (v: unknown): v is string =>
   typeof v === "string" && v.startsWith(LL3_PREFIX) && LL3_PATH.test(v.slice(LL3_PREFIX.length));
 
-export const LL3_FILE_API = "http://www.ll3.com.tw/platform/file_api.asp";
+export const LL3_FILE_API = "https://www.ll3.com.tw/platform/file_api.asp";
 
 function config() {
   const key = process.env.LL3_FILE_KEY;

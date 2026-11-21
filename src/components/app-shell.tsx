@@ -7,7 +7,6 @@ import {
   Axe,
   Apple,
   BookOpen,
-  Boxes,
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
@@ -216,9 +215,11 @@ function Shell({ pathname, children }: { pathname: string; children: React.React
           onClick={() => (mini ? setCollapsed(false) : toggleAllGroups(groups.map((g) => g.group)))}
           title={mini ? "展開選單" : allClosed ? "全部展開" : "全部收合"}
           aria-label={mini ? "展開選單" : allClosed ? "全部展開" : "全部收合"}
-          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-emerald-600 text-white transition-colors hover:bg-emerald-500"
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl transition hover:brightness-110"
         >
-          <Boxes size={22} />
+          {/* 平台自己的分頁圖示（favicon） */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/platforms/chou-platform.svg" width={40} height={40} alt="" className="block" />
         </button>
         {!mini && (
           <div className="min-w-0">

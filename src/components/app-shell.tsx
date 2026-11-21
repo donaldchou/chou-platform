@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { pageHref, pageLabel, pageOfPath, USER_PAGES } from "@/lib/page-access";
 import { logout, reload, useDBStatus, useMe } from "@/lib/store";
+import { PlatformLinks } from "./platform-links";
 
 const NAV = [
   {
@@ -274,6 +275,7 @@ function Shell({ pathname, children }: { pathname: string; children: React.React
         })}
       </div>
       <div className="space-y-1 border-t border-emerald-800 p-3">
+        <PlatformLinks current="chou-platform" mini={mini} captionClass="text-emerald-300/70" />
         <div
           className={`flex items-center gap-2 text-base text-emerald-100 ${mini ? "justify-center" : "px-2"}`}
           title={me ? `${me.email}（${roleLabel}）` : undefined}
